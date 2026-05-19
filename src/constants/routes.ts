@@ -17,3 +17,7 @@ export const BOOKINGS = "/bookings";
 export const BOOKING = "/booking";
 export const LOCATION = "/location";
 export const PASSENGER = "/passenger";
+export const BOOK = "/book";
+export const TRIPID = "/:tripId";
+export const SEARCH = "/search";
+export const ROUTE = "/route";

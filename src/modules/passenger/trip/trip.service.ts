@@ -1,5 +1,13 @@
 import prisma from "../../../config/database.js";
 import { CANCELLED, COMPLETED } from "../../../constants/labels.js";
+import {
+  NOT_ENOUGH_SEATS,
+  PICKUP_DROPOFF_LOCATION_INVALID,
+  PICKUP_DROPOFF_LOCATION_SAME,
+  TRIP_ALREADY_BOOKED,
+  TRIP_NOT_FOUND,
+} from "../../../constants/messages.js";
+import type { TUser } from "../../../constants/types.js";
 import type { BookTripInput, SearchTripInput } from "./trip.validator.js";
 
 class TripService {
@@ -36,30 +44,56 @@ class TripService {
     });
     return trips;
   }
-  async bookTrip(bookingData: BookTripInput, userId: string, tripId: string) {
+  async bookTrip(bookingData: BookTripInput, user: TUser, tripId: string) {
     const trip = await prisma.ride.findUnique({
       where: { id: tripId },
     });
     const currentBookings = await prisma.booking.aggregate({
-      where: { tripId, passengerId: userId },
+      where: { AND: [{ tripId }, { passengerId: user.userId }] },
       _sum: { seatBooked: true },
     });
 
     if (!trip) {
-      throw new Error("Trip not found");
+      throw new Error(TRIP_NOT_FOUND);
     }
-    if (currentBookings) {
-      throw new Error("You have already booked this trip");
+
+    // Already booked
+    if ((currentBookings._sum.seatBooked ?? 0) > 0) {
+      throw new Error(TRIP_ALREADY_BOOKED);
     }
+
+    // Seat validation
     if (trip.availableSeats < bookingData.seats) {
-      throw new Error("Not enough seats available");
+      throw new Error(NOT_ENOUGH_SEATS);
+    }
+
+    // Valid locations
+    const validLocations = [...trip.pickupLocations, trip.destinationLocation];
+
+    // Pickup validation
+    const isValidPickup = validLocations.includes(bookingData.pickupLocation);
+
+    // Dropoff validation
+    const isValidDropoff = validLocations.includes(bookingData.dropoffLocation);
+
+    // Same pickup & dropoff check
+    const isSameLocation =
+      bookingData.pickupLocation === bookingData.dropoffLocation;
+
+    if (!isValidPickup || !isValidDropoff) {
+      throw new Error(PICKUP_DROPOFF_LOCATION_INVALID);
+    }
+
+    if (isSameLocation) {
+      throw new Error(PICKUP_DROPOFF_LOCATION_SAME);
     }
     const [booking] = await prisma.$transaction([
       prisma.booking.create({
         data: {
           tripId: trip.id as string,
-          passengerId: userId,
+          passengerId: user.userId,
           price: trip.price * bookingData.seats,
+          passengerName: user.name,
           seatBooked: bookingData.seats,
           dropoffLocation: bookingData.dropoffLocation,
           pickupLocation: bookingData.pickupLocation,

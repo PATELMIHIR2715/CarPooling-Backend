@@ -1,4 +1,4 @@
-import { date, z } from "zod";
+import { z } from "zod";
 
 export const searchTripSchema = z.object({
   origin: z.object({

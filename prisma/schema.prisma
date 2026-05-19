@@ -57,6 +57,7 @@ model Booking {
     id              String        @id @default(uuid())
     tripId          String
     passengerId     String
+    passengerName   String?
     price           Float
     seatBooked      Int
     status          BookingStatus @default(PENDING)

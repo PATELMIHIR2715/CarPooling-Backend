@@ -8,6 +8,11 @@ export type TCar = {
   rcNumber: String;
 };
 
+export type TUser = {
+  userId: string;
+  name: string;
+}
+
 export type TLocationPoint = {
   name: string;
   fullName?: string;

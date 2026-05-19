@@ -34,7 +34,6 @@ class CarController {
       if (!cars) {
         return res.status(404).json({ error: NO_CARS_FOUND });
       }
-      console.log(cars);
       res.status(200).json(cars);
     } catch (error) {
       errorResponse(error, res);

@@ -17,11 +17,11 @@ class PassengerTripController {
   async bookTrip(req: any, res: Response) {
     try {
       const bookingData = req.body;
-      const userId = req.user.userId;
+      const user = req.user
       const tripId = req.params.tripId as string;
 
       const data = bookTripSchema.parse(bookingData);
-      const booking = await tripService.bookTrip(data, userId, tripId);
+      const booking = await tripService.bookTrip(data, user, tripId);
       res.status(200).json(booking);
     } catch (error) {
       errorResponse(error, res);

@@ -32,7 +32,7 @@ class AuthService {
         password: hashedPassword,
       },
     });
-    const tokens = generateTokens(user.id, role);
+    const tokens = generateTokens(user.id, role, user.name);
 
     await prisma.user.update({
       where: { id: user.id },
@@ -66,7 +66,7 @@ class AuthService {
       throw new Error(INVALID_LOGIN_CREDENTIALS);
     }
 
-    const tokens = generateTokens(user.id, user.role);
+    const tokens = generateTokens(user.id, user.role, user.name);
 
     await prisma.user.update({
       where: { id: user.id },
@@ -90,8 +90,9 @@ class AuthService {
     const decoded = verifyRefreshToken(refreshToken) as {
       userId: string;
       role: string;
+      name: string;
     };
-    const { userId, role } = decoded;
+    const { userId, role, name } = decoded;
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
 
@@ -99,7 +100,7 @@ class AuthService {
       throw new Error(INVALID_REFRESH_TOKEN);
     }
 
-    const accessToken = generateAccessToken(userId, role);
+    const accessToken = generateAccessToken(userId, role, name);
     return accessToken;
   }
 }
