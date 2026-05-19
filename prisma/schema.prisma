@@ -1,0 +1,209 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+model User {
+    id           String   @id @default(uuid())
+    name         String
+    email        String   @unique
+    phone        String   @unique
+    address      String?
+    role         Role     @default(PASSENGER)
+    password     String
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+    refreshToken String?  @unique
+
+    car          Car?
+    bookings     Booking[]
+    rides        Ride[]
+    waitingLists WaitingList[]
+    documents    Document[]
+    messages     Message[]
+
+    sentReviews     Review[] @relation("Reviewer")
+    receivedReviews Review[] @relation("Reviewee")
+
+    sentChats     Chat[] @relation("Sender")
+    receivedChats Chat[] @relation("Receiver")
+
+    @@map("tbl_user")
+}
+
+model Car {
+    id           String   @id @default(uuid())
+    make         String
+    model        String
+    year         Int
+    color        String
+    seater       Int
+    rcNumber     String   @unique
+    licensePlate String   @unique
+    driverId     String   @unique
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    driver User   @relation(fields: [driverId], references: [id])
+    rides  Ride[]
+
+    @@map("tbl_car")
+}
+
+model Booking {
+    id              String        @id @default(uuid())
+    tripId          String
+    passengerId     String
+    price           Float
+    seatBooked      Int
+    status          BookingStatus @default(PENDING)
+    createdAt       DateTime      @default(now())
+    updatedAt       DateTime      @updatedAt
+    dropoffLocation String
+    pickupLocation  String
+
+    ride      Ride @relation(fields: [tripId], references: [id])
+    passenger User @relation(fields: [passengerId], references: [id])
+
+    @@map("tbl_booking")
+}
+
+model Ride {
+    id                  String     @id @default(uuid())
+    driverId            String
+    price               Float
+    tripcode            String     @unique
+    status              RideStatus @default(SCHEDULED)
+    pickupLocations     String[]
+    destinationLocation String
+    endTime             DateTime
+    carId               String
+    origin              String
+    departureTime       DateTime
+    availableSeats      Int
+    createdAt           DateTime   @default(now())
+    updatedAt           DateTime   @updatedAt
+    reviews             Review[]
+
+    driver       User          @relation(fields: [driverId], references: [id])
+    bookings     Booking[]
+    car          Car           @relation(fields: [carId], references: [id])
+    waitingLists WaitingList[]
+    chats        Chat[]
+
+    @@map("tbl_ride")
+}
+
+model WaitingList {
+    id          String            @id @default(uuid())
+    rideId      String
+    passengerId String
+    createdAt   DateTime          @default(now())
+    updatedAt   DateTime          @updatedAt
+    position    Int
+    status      WaitingListStatus @default(WAITING)
+
+    ride      Ride @relation(fields: [rideId], references: [id])
+    passenger User @relation(fields: [passengerId], references: [id])
+
+    @@map("tbl_waiting_list")
+}
+
+model Document {
+    id            String         @id @default(uuid())
+    userId        String         @unique
+    licenceurl    String
+    rcurl         String
+    rcStatus      DocumentStatus @default(PENDING)
+    licenceStatus DocumentStatus @default(PENDING)
+    createdAt     DateTime       @default(now())
+    updatedAt     DateTime       @updatedAt
+
+    user User @relation(fields: [userId], references: [id])
+
+    @@map("tbl_document")
+}
+
+model Review {
+    id         String   @id @default(uuid())
+    reviewerId String
+    revieweeId String
+    rideId     String
+    rating     Int
+    comment    String?
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+
+    reviewer User @relation("Reviewer", fields: [reviewerId], references: [id])
+    reviewee User @relation("Reviewee", fields: [revieweeId], references: [id])
+    ride     Ride @relation(fields: [rideId], references: [id])
+
+    @@map("tbl_review")
+}
+
+model Chat {
+    id         String    @id @default(uuid())
+    senderId   String
+    receiverId String
+    message    Message[]
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @updatedAt
+    rideId     String
+    ride       Ride      @relation(fields: [rideId], references: [id])
+
+    sender   User @relation("Sender", fields: [senderId], references: [id])
+    receiver User @relation("Receiver", fields: [receiverId], references: [id])
+
+    @@map("tbl_chat")
+}
+
+model Message {
+    id        String   @id @default(uuid())
+    chatId    String
+    senderId  String
+    content   String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    isRead    Boolean  @default(false)
+
+    chat   Chat @relation(fields: [chatId], references: [id])
+    sender User @relation(fields: [senderId], references: [id])
+
+    @@map("tbl_message")
+}
+
+enum Role {
+    DRIVER
+    PASSENGER
+    ADMIN
+}
+
+enum BookingStatus {
+    PENDING
+    ACCEPTED
+    REJECTED
+    CANCELLED
+    COMPLETED
+}
+
+enum RideStatus {
+    SCHEDULED
+    ONGOING
+    COMPLETED
+    CANCELLED
+}
+
+enum WaitingListStatus {
+    WAITING
+    NOTIFIED
+    CANCELLED
+}
+
+enum DocumentStatus {
+    PENDING
+    APPROVED
+    REJECTED
+}
