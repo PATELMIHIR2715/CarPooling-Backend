@@ -13,9 +13,10 @@ export const DOCUMENTS_REQUIRED = "Documents are required";
 export const NO_DOCUMENTS_FOUND = "No documents found for this driver";
 export const CAR_ALREADY_EXISTS = "Car already exists for this driver";
 export const OVERLAP_TRIP = "Overlapping trips found";
-export const TRIP_NOT_FOUND = "Trip not found";
 export const BOOKINGS_NOT_FOUND = "Bookings not found";
 export const INVALID_STATUS = "Invalid status";
+export const INVALID_QUERY = "Invalid query parameters";
+export const REQUEST_FAILED = "Request failed";
 
 // Prisma Error Messages
 export const ALREADY_EXISTS = "Already exists";
@@ -29,3 +30,14 @@ export const UNAUTHORIZED = "Unauthorized";
 export const FORBIDDEN = "Forbidden";
 export const INVALID_REFRESH_TOKEN = "Invalid refresh token";
 export const UNAUTHORIZED_ACCESS = "Unauthorized access";
+
+// trip messages
+
+export const TRIP_ALREADY_BOOKED = "You have already booked this trip";
+export const NOT_ENOUGH_SEATS = "Not enough seats available";
+export const TRIP_NOT_FOUND = "Trip not found";
+export const PICKUP_DROPOFF_LOCATION_INVALID =
+  "Pickup and dropoff locations cannot be the same";
+export const PICKUP_DROPOFF_LOCATION_SAME =
+  "Pickup and dropoff locations cannot be the same";
+export const ROUTE_NOT_FOUND = "Route not found";

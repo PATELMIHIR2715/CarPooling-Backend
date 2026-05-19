@@ -47,6 +47,13 @@ app.use(`${API}${BOOKING}`, bookingRoutes);
 app.use(`${API}${LOCATION}`, locationRoutes);
 app.use(`${API}${PASSENGER}`, passengerTripRoutes);
 
+app.get("/health", (_, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Server running",
+  });
+});
+
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 

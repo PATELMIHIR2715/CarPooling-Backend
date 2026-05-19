@@ -1,6 +1,6 @@
 import { Router } from "express";
 import tripController from "./trip.controller.js";
-import { GET_TRIPS } from "../../../constants/routes.js";
+import { BOOK, GET_TRIPS, TRIPID } from "../../../constants/routes.js";
 import { authenticate, authorize } from "../../auth/auth.middleware.js";
 import { PASSENGER_ROLE } from "../../../constants/labels.js";
 
@@ -14,7 +14,7 @@ router.post(
 );
 
 router.post(
-  "/:tripId/book",
+  `${TRIPID}${BOOK}`,
   authenticate,
   authorize([PASSENGER_ROLE]),
   tripController.bookTrip

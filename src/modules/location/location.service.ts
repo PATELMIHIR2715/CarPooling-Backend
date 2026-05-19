@@ -1,3 +1,4 @@
+import { REQUEST_FAILED, ROUTE_NOT_FOUND } from "../../constants/messages.js";
 import type { TLocationPoint, TRoutePoint } from "../../constants/types.js";
 
 class LocationService {
@@ -36,7 +37,7 @@ class LocationService {
       }
     }
 
-    throw new Error("Request failed");
+    throw new Error(REQUEST_FAILED);
   }
 
   // ---------------------------------------------------
@@ -74,7 +75,7 @@ class LocationService {
     const data = await this.fetchWithRetry(url);
 
     if (!data?.routes?.length) {
-      throw new Error("Route not found");
+      throw new Error(ROUTE_NOT_FOUND);
     }
 
     return data.routes[0];
