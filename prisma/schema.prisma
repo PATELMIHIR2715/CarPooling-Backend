@@ -78,11 +78,15 @@ model Ride {
     price               Float
     tripcode            String     @unique
     status              RideStatus @default(SCHEDULED)
-    pickupLocations     String[]
+    pickupLocations     Json[]
     destinationLocation String
+    destinationLat      Float?
+    destinationLon      Float?
     endTime             DateTime
     carId               String
     origin              String
+    originLat           Float?
+    originLon           Float?
     departureTime       DateTime
     availableSeats      Int
     createdAt           DateTime   @default(now())

@@ -32,4 +32,3 @@ Thumbs.db
 # Optional
 coverage/
 
-prisma/migrations/
