@@ -11,6 +11,7 @@ import tripRoutes from "./modules/driver/trip/trip.routes.js";
 import bookingRoutes from "./modules/driver/bookings/booking.routes.js";
 import locationRoutes from "./modules/location/location.routes.js";
 import passengerTripRoutes from "./modules/passenger/trip/trip.routes.js";
+import passengerBookingRoutes from "./modules/passenger/booking/booking.routes.js";
 import {
   API,
   AUTH,
@@ -46,6 +47,7 @@ app.use(`${API}${TRIP}`, tripRoutes);
 app.use(`${API}${BOOKING}`, bookingRoutes);
 app.use(`${API}${LOCATION}`, locationRoutes);
 app.use(`${API}${PASSENGER}`, passengerTripRoutes);
+app.use(`${API}${PASSENGER}`, passengerBookingRoutes);
 
 app.get("/health", (_, res) => {
   res.status(200).json({

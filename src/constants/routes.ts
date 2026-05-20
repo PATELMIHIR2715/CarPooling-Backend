@@ -21,3 +21,5 @@ export const BOOK = "/book";
 export const TRIPID = "/:tripId";
 export const SEARCH = "/search";
 export const ROUTE = "/route";
+export const BOOKINGID = "/:bookingId";
+export const CANCEL = "/cancel";
