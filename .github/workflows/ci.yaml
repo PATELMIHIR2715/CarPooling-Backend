@@ -1,34 +1,43 @@
-name: Backend CI
+name: Backend CI/CD
 
 on:
   push:
     branches:
-      - main
-      - develop
-
-  pull_request:
-    branches:
-      - main
-      - develop
+      - master
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
 
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Generate Prisma Client
         run: npx prisma generate
 
       - name: Build Project
         run: npm run build
+
+  deploy:
+    needs: build
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render Deploy
+        run: |
+          curl -X POST \
+          ${{ secrets.RENDER_DEPLOY_HOOK }}
