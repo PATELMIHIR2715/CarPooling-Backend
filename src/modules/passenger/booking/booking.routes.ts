@@ -2,7 +2,13 @@ import { Router } from "express";
 import { authenticate, authorize } from "../../auth/auth.middleware.js";
 import { PASSENGER_ROLE } from "../../../constants/labels.js";
 import PassengerController from "./booking.controller.js";
-import { BOOKINGID, BOOKINGS, CANCEL } from "../../../constants/routes.js";
+import {
+  BOOKINGID,
+  BOOKINGS,
+  CANCEL,
+  TRIPID,
+  WAITLIST,
+} from "../../../constants/routes.js";
 
 const router = Router();
 
@@ -18,6 +24,13 @@ router.put(
   authenticate,
   authorize([PASSENGER_ROLE]),
   PassengerController.cancelBooking
+);
+
+router.post(
+  `${BOOKINGS}${TRIPID}${WAITLIST}`,
+  authenticate,
+  authorize([PASSENGER_ROLE]),
+  PassengerController.joinWaitlist
 );
 
 export default router;

@@ -1,5 +1,9 @@
 import prisma from "../../../config/database.js";
 import { CANCELLED } from "../../../constants/labels.js";
+import {
+  BOOKINGS_NOT_FOUND,
+  TRIP_NOT_FOUND,
+} from "../../../constants/messages.js";
 import PassengerBookingValidator from "./booking.validator.js";
 
 class PassengerBookingService {
@@ -26,12 +30,48 @@ class PassengerBookingService {
       where: { id: bookingId },
     });
     PassengerBookingValidator.validateCancelBooking(booking, userId);
-    const cancelledBooking = await prisma.booking.update({
-      where: { id: bookingId },
-      data: { status: CANCELLED },
-    });
+
+    if (!booking) {
+      throw new Error(BOOKINGS_NOT_FOUND);
+    }
+
+    const cancelledBooking = await prisma.$transaction([
+      prisma.booking.update({
+        where: { id: bookingId },
+        data: { status: CANCELLED },
+      }),
+      prisma.ride.update({
+        where: { id: booking.tripId },
+        data: { availableSeats: { increment: booking.seatBooked ?? 0 } },
+      }),
+    ]);
 
     return cancelledBooking;
+  }
+
+  async joinWaitlist(tripId: string, userId: string) {
+    const trip = await prisma.ride.findUnique({
+      where: { id: tripId },
+      include: {
+        waitingLists: { where: { passengerId: userId } },
+        _count: {
+          select: { waitingLists: true },
+        },
+      },
+    });
+    if (!trip) {
+      throw new Error(TRIP_NOT_FOUND);
+    }
+    PassengerBookingValidator.validateWaitlistEntry(trip, userId);
+
+    const waitList = await prisma.waitingList.create({
+      data: {
+        rideId: tripId,
+        passengerId: userId,
+        position: trip._count.waitingLists + 1,
+      },
+    });
+    return waitList;
   }
 }
 

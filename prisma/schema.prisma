@@ -104,12 +104,13 @@ model WaitingList {
     passengerId String
     createdAt   DateTime          @default(now())
     updatedAt   DateTime          @updatedAt
-    position    Int
+    position    Int               @default(0)
     status      WaitingListStatus @default(WAITING)
 
     ride      Ride @relation(fields: [rideId], references: [id])
     passenger User @relation(fields: [passengerId], references: [id])
 
+    @@unique([rideId, passengerId])
     @@map("tbl_waiting_list")
 }
 

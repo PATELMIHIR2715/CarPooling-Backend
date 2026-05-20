@@ -41,3 +41,10 @@ export const PICKUP_DROPOFF_LOCATION_INVALID =
 export const PICKUP_DROPOFF_LOCATION_SAME =
   "Pickup and dropoff locations cannot be the same";
 export const ROUTE_NOT_FOUND = "Route not found";
+export const SEATS_AVAILABLE = "Seats are available, no need to join waitlist";
+export const ALREADY_IN_WAITLIST = "Already in waitlist for this trip";
+
+// Booking messages
+export const BOOKING_ALREADY_CANCELLED = "Booking is already cancelled";
+export const TRIP_COMPLETED = "Trip is already completed";
+export const UNAUTHORIZED_CANCEL = "Unauthorized to cancel this booking";
