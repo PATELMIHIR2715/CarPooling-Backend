@@ -1,15 +1,9 @@
-name: Backend CI
+name: Backend CI/CD
 
 on:
   push:
     branches:
       - master
-      - development
-
-  pull_request:
-    branches:
-      - master
-      - development
 
 jobs:
   build:
@@ -36,3 +30,14 @@ jobs:
 
       - name: Build Project
         run: npm run build
+
+  deploy:
+    needs: build
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render Deploy
+        run: |
+          curl -X POST \
+          ${{ secrets.RENDER_DEPLOY_HOOK }}
