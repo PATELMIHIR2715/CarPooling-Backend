@@ -103,13 +103,16 @@ model Ride {
 }
 
 model WaitingList {
-    id          String            @id @default(uuid())
-    rideId      String
-    passengerId String
-    createdAt   DateTime          @default(now())
-    updatedAt   DateTime          @updatedAt
-    position    Int               @default(0)
-    status      WaitingListStatus @default(WAITING)
+    id              String            @id @default(uuid())
+    rideId          String
+    passengerId     String
+    pickupLocation  String            @default("")
+    dropoffLocation String            @default("")
+    seatsRequested  Int               @default(1)
+    createdAt       DateTime          @default(now())
+    updatedAt       DateTime          @updatedAt
+    position        Int               @default(0)
+    status          WaitingListStatus @default(WAITING)
 
     ride      Ride @relation(fields: [rideId], references: [id])
     passenger User @relation(fields: [passengerId], references: [id])
@@ -205,6 +208,7 @@ enum RideStatus {
 enum WaitingListStatus {
     WAITING
     NOTIFIED
+    ACCEPTED
     CANCELLED
 }
 

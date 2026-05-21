@@ -4,6 +4,7 @@ import {
   BOOKINGS_NOT_FOUND,
   TRIP_NOT_FOUND,
 } from "../../../constants/messages.js";
+import type { BookTripInput } from "../trip/trip.validator.js";
 import PassengerBookingValidator from "./booking.validator.js";
 
 class PassengerBookingService {
@@ -49,7 +50,7 @@ class PassengerBookingService {
     return cancelledBooking;
   }
 
-  async joinWaitlist(tripId: string, userId: string) {
+  async joinWaitlist(tripId: string, userId: string, bookingData: any) {
     const trip = await prisma.ride.findUnique({
       where: { id: tripId },
       include: {
@@ -68,6 +69,9 @@ class PassengerBookingService {
       data: {
         rideId: tripId,
         passengerId: userId,
+        pickupLocation: bookingData.pickupLocation,
+        dropoffLocation: bookingData.dropoffLocation,
+        seatsRequested: bookingData.seats,
         position: trip._count.waitingLists + 1,
       },
     });

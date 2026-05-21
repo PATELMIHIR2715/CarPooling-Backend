@@ -74,9 +74,18 @@ class TripService {
         return false;
       }
 
+      const allPickupPoints = [
+        ...pickupPoints,
+        {
+          name: trip.origin,
+          lat: trip.originLat ?? 0,
+          lon: trip.originLon ?? 0,
+        },
+      ];
+
       const originMatch = findNearestPickupPoint(
         data.origin,
-        pickupPoints,
+        allPickupPoints,
         SEARCH_THRESHOLD_KM
       ).isNear;
       const destinationMatch =
@@ -114,14 +123,23 @@ class TripService {
     }
 
     const pickupPoints = toPickupPoints(trip.pickupLocations);
+
+    const allPickupPoints = [
+      ...pickupPoints,
+      {
+        name: trip.origin,
+        lat: trip.originLat ?? 0,
+        lon: trip.originLon ?? 0,
+      },
+    ];
     const destinationPoint = getDestinationPoint(trip);
     const dropoffPoints = destinationPoint
-      ? [...pickupPoints, destinationPoint]
-      : pickupPoints;
+      ? [...allPickupPoints, destinationPoint]
+      : allPickupPoints;
 
     const isValidPickup = findNearestPickupPoint(
       bookingData.pickupLocation,
-      pickupPoints,
+      allPickupPoints,
       BOOKING_THRESHOLD_KM
     ).isNear;
 

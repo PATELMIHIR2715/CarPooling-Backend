@@ -1,6 +1,10 @@
 export const COMPLETED = "COMPLETED";
 export const PENDING = "PENDING";
 export const CANCELLED = "CANCELLED";
+export const ONGOING = "ONGOING";
+export const WAITING = "WAITING";
+export const SCHEDULED = "SCHEDULED";
+export const ACCEPTED = "ACCEPTED";
 export const DRIVER_ROLE = "DRIVER";
 export const PASSENGER_ROLE = "PASSENGER";
 export const ADMIN_ROLE = "ADMIN";

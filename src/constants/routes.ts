@@ -24,3 +24,4 @@ export const ROUTE = "/route";
 export const BOOKINGID = "/:bookingId";
 export const CANCEL = "/cancel";
 export const WAITLIST = "/waitlist";
+export const RATING = "/rating";

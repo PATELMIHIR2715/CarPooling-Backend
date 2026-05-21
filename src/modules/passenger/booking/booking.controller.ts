@@ -32,9 +32,11 @@ class PassengerBookingController {
     try {
       const userId = req.user.userId;
       const tripId = req.params.tripId;
+      const bookingData = req.body;
       const waitlistEntry = await passengerBookingService.joinWaitlist(
         tripId,
-        userId
+        userId,
+        bookingData
       );
       res.status(200).json({ waitlistEntry });
     } catch (error) {
