@@ -17,6 +17,7 @@ export const BOOKINGS_NOT_FOUND = "Bookings not found";
 export const INVALID_STATUS = "Invalid status";
 export const INVALID_QUERY = "Invalid query parameters";
 export const REQUEST_FAILED = "Request failed";
+export const USER_NOT_FOUND = "User not found";
 
 // Prisma Error Messages
 export const ALREADY_EXISTS = "Already exists";

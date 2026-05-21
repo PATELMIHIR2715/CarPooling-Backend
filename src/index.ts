@@ -16,6 +16,7 @@ import locationRoutes from "./modules/location/location.routes.js";
 import passengerTripRoutes from "./modules/passenger/trip/trip.routes.js";
 import passengerBookingRoutes from "./modules/passenger/booking/booking.routes.js";
 import ratingRoutes from "./modules/rating/rate.routes.js";
+import userRoutes from "./modules/admin/users/user.routes.js";
 import {
   API,
   AUTH,
@@ -25,6 +26,7 @@ import {
   LOCATION,
   PASSENGER,
   RATING,
+  ADMIN,
 } from "./constants/routes.js";
 // test connection
 
@@ -54,6 +56,7 @@ app.use(`${API}${LOCATION}`, locationRoutes);
 app.use(`${API}${PASSENGER}`, passengerTripRoutes);
 app.use(`${API}${PASSENGER}`, passengerBookingRoutes);
 app.use(`${API}${RATING}`, ratingRoutes);
+app.use(`${API}${ADMIN}`, userRoutes);
 
 app.get("/health", (_, res) => {
   res.status(200).json({

@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import prisma from "../../../config/database.js";
 import { CANCELLED, COMPLETED } from "../../../constants/labels.js";
 import {
@@ -52,9 +53,14 @@ const getDestinationPoint = (trip: {
 };
 
 class TripService {
-  async getTripsBySearch(data: SearchTripInput) {
+  async getTripsBySearch(
+    data: SearchTripInput,
+    filter: Prisma.RideFindManyArgs
+  ) {
     const trips = await prisma.ride.findMany({
+      ...filter,
       where: {
+        ...filter.where,
         AND: [
           { status: { notIn: [CANCELLED, COMPLETED] } },
           { availableSeats: { gte: data.seats ?? 1 } },
