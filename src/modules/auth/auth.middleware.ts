@@ -2,8 +2,13 @@ import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import env from "../../config/env.js";
 import { FORBIDDEN, UNAUTHORIZED } from "../../constants/messages.js";
+import redis from "../../config/redis.js";
 
-export const authenticate = (req: any, res: Response, next: NextFunction) => {
+export const authenticate = async (
+  req: any,
+  res: Response,
+  next: NextFunction
+) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
     return res.status(401).json({ error: UNAUTHORIZED });
@@ -12,6 +17,13 @@ export const authenticate = (req: any, res: Response, next: NextFunction) => {
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET);
     req.user = decoded;
+    const isRestricted = await redis.sismember(
+      "restricted_users",
+      req.user.userId
+    );
+    if (isRestricted) {
+      return res.status(403).json({ error: "Account is restricted" });
+    }
     next();
   } catch (error) {
     return res.status(401).json({ error: UNAUTHORIZED });

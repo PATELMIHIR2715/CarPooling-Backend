@@ -3,6 +3,9 @@ import cors from "cors";
 import "dotenv/config";
 import cookieParser from "cookie-parser";
 
+import { startTripCron } from "./cron/trip.cron.js";
+import { startBookingCron } from "./cron/booking.cron.js";
+import { startWaitlistCron } from "./cron/waitlist.cron.js";
 import env from "./config/env.js";
 import prisma from "./config/database.js";
 import authRoutes from "./modules/auth/auth.routes.js";
@@ -11,6 +14,9 @@ import tripRoutes from "./modules/driver/trip/trip.routes.js";
 import bookingRoutes from "./modules/driver/bookings/booking.routes.js";
 import locationRoutes from "./modules/location/location.routes.js";
 import passengerTripRoutes from "./modules/passenger/trip/trip.routes.js";
+import passengerBookingRoutes from "./modules/passenger/booking/booking.routes.js";
+import ratingRoutes from "./modules/rating/rate.routes.js";
+import userRoutes from "./modules/admin/users/user.routes.js";
 import {
   API,
   AUTH,
@@ -19,6 +25,8 @@ import {
   TRIP,
   LOCATION,
   PASSENGER,
+  RATING,
+  ADMIN,
 } from "./constants/routes.js";
 // test connection
 
@@ -46,6 +54,9 @@ app.use(`${API}${TRIP}`, tripRoutes);
 app.use(`${API}${BOOKING}`, bookingRoutes);
 app.use(`${API}${LOCATION}`, locationRoutes);
 app.use(`${API}${PASSENGER}`, passengerTripRoutes);
+app.use(`${API}${PASSENGER}`, passengerBookingRoutes);
+app.use(`${API}${RATING}`, ratingRoutes);
+app.use(`${API}${ADMIN}`, userRoutes);
 
 app.get("/health", (_, res) => {
   res.status(200).json({
@@ -59,6 +70,11 @@ app.listen(port, () => {
 
   prisma
     .$connect()
-    .then(() => console.log("Database connected successfully!"))
+    .then(() => {
+      console.log("Database connected successfully!");
+      startTripCron();
+      startBookingCron();
+      startWaitlistCron();
+    })
     .catch((err) => console.error("Database connection failed:", err));
 });

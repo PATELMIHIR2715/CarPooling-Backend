@@ -163,7 +163,7 @@ class LocationService {
     const uniquePoints = this.removeDuplicates(routePoints);
 
     // Limit points for cleaner UI
-    const limitedPoints = uniquePoints.slice(0, 25);
+    const limitedPoints = uniquePoints.slice(0, 100);
 
     // Final Response
     return [

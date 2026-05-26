@@ -10,6 +10,8 @@ const envSchema = z.object({
   CLOUDINARY_API_SECRET: z.string(),
   ORS_API_KEY: z.string(),
   GEOAPIFY_API_KEY: z.string(),
+  UPSTASH_REDIS_URL: z.string(),
+  UPSTASH_REDIS_TOKEN: z.string(),
 });
 const env = envSchema.parse(process.env);
 export default env;

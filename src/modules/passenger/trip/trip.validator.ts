@@ -1,24 +1,22 @@
 import { z } from "zod";
 
+const locationSchema = z.object({
+  lat: z.coerce.number(),
+  lon: z.coerce.number(),
+  name: z.string().min(1),
+});
+
 export const searchTripSchema = z.object({
-  origin: z.object({
-    lat: z.string(),
-    lon: z.string(),
-    name: z.string(),
-  }),
-  destination: z.object({
-    lat: z.string(),
-    lon: z.string(),
-    name: z.string(),
-  }),
+  origin: locationSchema,
+  destination: locationSchema,
   dateAndTime: z.string(),
   seats: z.number().min(1).max(6),
 });
 
 export const bookTripSchema = z.object({
   seats: z.number().min(1).max(6),
-  pickupLocation: z.string(),
-  dropoffLocation: z.string(),
+  pickupLocation: locationSchema,
+  dropoffLocation: locationSchema,
 });
 
 export type SearchTripInput = z.infer<typeof searchTripSchema>;

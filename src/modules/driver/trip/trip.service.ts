@@ -1,9 +1,12 @@
+import { Prisma } from "@prisma/client";
+
 import prisma from "../../../config/database.js";
 import { CANCELLED, COMPLETED } from "../../../constants/labels.js";
 import { OVERLAP_TRIP, TRIP_NOT_FOUND } from "../../../constants/messages.js";
+import type { CreateTrip } from "./trip.validator.js";
 
 class TripService {
-  async createTrip(driverId: string, data: any) {
+  async createTrip(driverId: string, data: CreateTrip) {
     const car = await prisma.car.findUnique({
       where: {
         driverId,
@@ -46,7 +49,18 @@ class TripService {
       tripcode: tripCode,
       carId: car.id,
       driverId,
-      ...data,
+      price: data.price,
+      pickupLocations: (data.pickupLocations ??
+        []) as Prisma.InputJsonValue[],
+      destinationLocation: data.destination.name,
+      destinationLat: data.destination.lat,
+      destinationLon: data.destination.lon,
+      endTime: new Date(data.endTime),
+      origin: data.origin.name,
+      originLat: data.origin.lat,
+      originLon: data.origin.lon,
+      departureTime: new Date(data.departureTime),
+      availableSeats: data.availableSeats,
     };
 
     const trip = await prisma.ride.create({

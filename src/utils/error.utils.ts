@@ -37,7 +37,9 @@ export const errorResponse = (
   }
 
   if (error instanceof PrismaClientValidationError) {
-    return res.status(statusCode).json({ error: error.message });
+    return res.status(400).json({
+      error: "Invalid data provided to database",
+    });
   }
 
   res.status(statusCode).json({ error: (error as Error).message });

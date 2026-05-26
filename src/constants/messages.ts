@@ -17,6 +17,7 @@ export const BOOKINGS_NOT_FOUND = "Bookings not found";
 export const INVALID_STATUS = "Invalid status";
 export const INVALID_QUERY = "Invalid query parameters";
 export const REQUEST_FAILED = "Request failed";
+export const USER_NOT_FOUND = "User not found";
 
 // Prisma Error Messages
 export const ALREADY_EXISTS = "Already exists";
@@ -41,3 +42,17 @@ export const PICKUP_DROPOFF_LOCATION_INVALID =
 export const PICKUP_DROPOFF_LOCATION_SAME =
   "Pickup and dropoff locations cannot be the same";
 export const ROUTE_NOT_FOUND = "Route not found";
+export const SEATS_AVAILABLE = "Seats are available, no need to join waitlist";
+export const ALREADY_IN_WAITLIST = "Already in waitlist for this trip";
+export const TRIP_NOT_COMPLETED = "Trip is not completed yet";
+export const PASSRNGER_NOT_ASSOCIATED =
+  "Passenger is not associated with this trip";
+
+// Booking messages
+export const BOOKING_ALREADY_CANCELLED = "Booking is already cancelled";
+export const TRIP_COMPLETED = "Trip is already completed";
+export const UNAUTHORIZED_CANCEL = "Unauthorized to cancel this booking";
+
+// Rating messages
+export const RATING_ALREADY_SUBMITTED =
+  "Rating already submitted for this trip";
