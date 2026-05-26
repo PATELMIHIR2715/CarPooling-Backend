@@ -3,21 +3,31 @@ import type { Prisma, Role } from "@prisma/client";
 import prisma from "../../../config/database.js";
 import { USER_NOT_FOUND } from "../../../constants/messages.js";
 import redis from "../../../config/redis.js";
+import {
+  buildPaginationMeta,
+  type FilterInput,
+} from "../../../utils/buildquery.utils.js";
 
 class AdminUserService {
-  async getAllUsers(usersType: string, filters: Prisma.UserFindManyArgs) {
+  async getAllUsers(usersType: string, filters: any) {
     if (usersType) {
       const users = await prisma.user.findMany({
         ...filters,
         where: {
           role: usersType.toUpperCase() as Role,
-          ...filters.where,
         },
       });
       return users;
     }
     const users = await prisma.user.findMany(filters);
-    return users;
+    return {
+      data: users,
+      meta: buildPaginationMeta(
+        users.length,
+        Math.ceil(filters.skip / filters.take) + 1,
+        filters.take
+      ),
+    };
   }
 
   async getUserById(userId: string) {

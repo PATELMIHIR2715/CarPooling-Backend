@@ -15,6 +15,7 @@ import {
   type LocationPoint,
 } from "../../../utils/location.utils.js";
 import type { BookTripInput, SearchTripInput } from "./trip.validator.js";
+import { buildPaginationMeta } from "../../../utils/buildquery.utils.js";
 
 const SEARCH_THRESHOLD_KM = 5;
 const BOOKING_THRESHOLD_KM = 2;
@@ -53,10 +54,7 @@ const getDestinationPoint = (trip: {
 };
 
 class TripService {
-  async getTripsBySearch(
-    data: SearchTripInput,
-    filter: Prisma.RideFindManyArgs
-  ) {
+  async getTripsBySearch(data: SearchTripInput, filter: any) {
     const trips = await prisma.ride.findMany({
       ...filter,
       where: {
@@ -72,38 +70,45 @@ class TripService {
         car: true,
       },
     });
-    return trips.filter((trip) => {
-      const pickupPoints = toPickupPoints(trip.pickupLocations);
-      const destinationPoint = getDestinationPoint(trip);
+    return {
+      data: trips.filter((trip) => {
+        const pickupPoints = toPickupPoints(trip.pickupLocations);
+        const destinationPoint = getDestinationPoint(trip);
 
-      if (!destinationPoint) {
-        return false;
-      }
+        if (!destinationPoint) {
+          return false;
+        }
 
-      const allPickupPoints = [
-        ...pickupPoints,
-        {
-          name: trip.origin,
-          lat: trip.originLat ?? 0,
-          lon: trip.originLon ?? 0,
-        },
-      ];
+        const allPickupPoints = [
+          ...pickupPoints,
+          {
+            name: trip.origin,
+            lat: trip.originLat ?? 0,
+            lon: trip.originLon ?? 0,
+          },
+        ];
 
-      const originMatch = findNearestPickupPoint(
-        data.origin,
-        allPickupPoints,
-        SEARCH_THRESHOLD_KM
-      ).isNear;
-      const destinationMatch =
-        haversineDistance(
-          data.destination.lat,
-          data.destination.lon,
-          destinationPoint.lat,
-          destinationPoint.lon
-        ) <= SEARCH_THRESHOLD_KM;
+        const originMatch = findNearestPickupPoint(
+          data.origin,
+          allPickupPoints,
+          SEARCH_THRESHOLD_KM
+        ).isNear;
+        const destinationMatch =
+          haversineDistance(
+            data.destination.lat,
+            data.destination.lon,
+            destinationPoint.lat,
+            destinationPoint.lon
+          ) <= SEARCH_THRESHOLD_KM;
 
-      return originMatch && destinationMatch;
-    });
+        return originMatch && destinationMatch;
+      }),
+      meta: buildPaginationMeta(
+        trips.length,
+        Math.ceil(filter.skip / filter.take) + 1,
+        filter.take
+      ),
+    };
   }
   async bookTrip(bookingData: BookTripInput, user: TUser, tripId: string) {
     const trip = await prisma.ride.findUnique({

@@ -1,13 +1,14 @@
 import type { Response } from "express";
 import { errorResponse } from "../../../utils/error.utils.js";
 import AdminUserService from "./user.service.js";
-import { buildQuery } from "../../../utils/buildquery.utils.js";
+import { buildFilterQuery } from "../../../utils/buildquery.utils.js";
+import { USER_FILTERS } from "../../../filters/user.filter.js";
 
 class AdminUserController {
   async getAllUsers(req: any, res: Response) {
     try {
       const usersType = req.query.type as string;
-      const filters = buildQuery(req.body);
+      const filters = buildFilterQuery(req.body, USER_FILTERS);
 
       const users = await AdminUserService.getAllUsers(usersType, filters);
       res.status(200).json({ users });
