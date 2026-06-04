@@ -54,14 +54,15 @@ class DocumentsService {
     });
 
     if (pendingDocument === 0) {
-      prisma.user.update({
+      await prisma.user.update({
         where: { id: updatedDocument.userId },
         data: { verified: true },
       });
-      prisma.document.update({
+      const document = await prisma.document.update({
         where: { id: documentId },
         data: { status: "APPROVED" },
       });
+      return document;
     }
 
     return updatedDocument;
