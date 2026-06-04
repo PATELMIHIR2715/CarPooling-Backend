@@ -129,6 +129,7 @@ model Document {
     rcurl         String
     rcStatus      DocumentStatus @default(PENDING)
     licenceStatus DocumentStatus @default(PENDING)
+    status        DocumentStatus @default(PENDING)
     createdAt     DateTime       @default(now())
     updatedAt     DateTime       @updatedAt
 

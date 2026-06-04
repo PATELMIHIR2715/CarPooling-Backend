@@ -11,19 +11,33 @@ import {
 class AdminUserService {
   async getAllUsers(usersType: string, filters: any) {
     if (usersType) {
-      const users = await prisma.user.findMany({
-        ...filters,
-        where: {
-          role: usersType.toUpperCase() as Role,
-        },
-      });
-      return users;
+      const [users, total] = await prisma.$transaction([
+        prisma.user.findMany({
+          ...filters,
+          where: {
+            role: usersType.toUpperCase() as Role,
+          },
+        }),
+        prisma.user.count({ where: filters.where }),
+      ]);
+
+      return {
+        data: users,
+        meta: buildPaginationMeta(
+          total,
+          Math.ceil(filters.skip / filters.take) + 1,
+          filters.take
+        ),
+      };
     }
-    const users = await prisma.user.findMany(filters);
+    const [users, total] = await prisma.$transaction([
+      prisma.user.findMany(filters),
+      prisma.user.count({ where: filters.where }),
+    ]);
     return {
       data: users,
       meta: buildPaginationMeta(
-        users.length,
+        total,
         Math.ceil(filters.skip / filters.take) + 1,
         filters.take
       ),

@@ -55,21 +55,26 @@ const getDestinationPoint = (trip: {
 
 class TripService {
   async getTripsBySearch(data: SearchTripInput, filter: any) {
-    const trips = await prisma.ride.findMany({
-      ...filter,
-      where: {
-        ...filter.where,
-        AND: [
-          { status: { notIn: [CANCELLED, COMPLETED] } },
-          { availableSeats: { gte: data.seats ?? 1 } },
-          { departureTime: { gte: new Date(data.dateAndTime) } },
-        ],
-      },
-      include: {
-        driver: { select: { name: true, email: true, phone: true } },
-        car: true,
-      },
-    });
+    const [trips, total] = await prisma.$transaction([
+      prisma.ride.findMany({
+        ...filter,
+        where: {
+          ...filter.where,
+          AND: [
+            { status: { notIn: [CANCELLED, COMPLETED] } },
+            { availableSeats: { gte: data.seats ?? 1 } },
+            { departureTime: { gte: new Date(data.dateAndTime) } },
+          ],
+        },
+        include: {
+          driver: { select: { name: true, email: true, phone: true } },
+          car: true,
+        },
+      }),
+      prisma.ride.count({
+        where: filter.where,
+      }),
+    ]);
     return {
       data: trips.filter((trip) => {
         const pickupPoints = toPickupPoints(trip.pickupLocations);
@@ -104,7 +109,7 @@ class TripService {
         return originMatch && destinationMatch;
       }),
       meta: buildPaginationMeta(
-        trips.length,
+        total,
         Math.ceil(filter.skip / filter.take) + 1,
         filter.take
       ),

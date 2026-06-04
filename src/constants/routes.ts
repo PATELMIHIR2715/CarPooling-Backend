@@ -30,3 +30,7 @@ export const RESTRICT = "/restrict";
 export const UNRESTRICT = "/unrestrict";
 export const ADMIN = "/admin";
 export const USERS = "/users";
+export const STATS = "/stats";
+export const DOCUMENTID = "/:documentId";
+export const TYPE = "/:type";
+export const STATUS = "/:status";

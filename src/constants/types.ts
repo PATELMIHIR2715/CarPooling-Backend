@@ -11,7 +11,7 @@ export type TCar = {
 export type TUser = {
   userId: string;
   name: string;
-}
+};
 
 export type TLocationPoint = {
   name: string;
@@ -27,3 +27,5 @@ export type TRoutePoint = {
   lon: number;
   type: "start" | "end" | "route_point";
 };
+
+export type TDocumentStatus = "PENDING" | "APPROVED" | "REJECTED";
