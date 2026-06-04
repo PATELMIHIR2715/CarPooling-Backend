@@ -1,1 +1,1 @@
-export const USER_FILTERS = ["name", "email", "phone"];
+export const USER_FILTERS = ["id", "name", "email", "phone"];

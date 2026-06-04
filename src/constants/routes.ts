@@ -34,3 +34,4 @@ export const STATS = "/stats";
 export const DOCUMENTID = "/:documentId";
 export const TYPE = "/:type";
 export const STATUS = "/:status";
+export const TRIPS = "/trips";
