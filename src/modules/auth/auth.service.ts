@@ -12,6 +12,7 @@ import {
   INVALID_REFRESH_TOKEN,
 } from "../../constants/messages.js";
 import type { RegisterInput, LoginInput } from "./auth.validator.js";
+import { emailProducer } from "../../utils/emailProducer.utils.js";
 
 class AuthService {
   async registerUser(request: RegisterInput) {
@@ -40,6 +41,8 @@ class AuthService {
         refreshToken: tokens.refreshToken,
       },
     });
+
+    await emailProducer.sendWelcomeEmail(user.email, user.name, user.role);
 
     return {
       user: {

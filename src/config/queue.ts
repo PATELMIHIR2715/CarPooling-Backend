@@ -1,0 +1,32 @@
+import { Queue } from "bullmq";
+import { Redis } from "@upstash/redis";
+import env from "./env.js";
+import {
+  EMAIL_JOB_BOOKING_CONFIRMATION,
+  EMAIL_JOB_BOOKING_REJECT,
+  EMAIL_JOB_BOOKING_REQUEST,
+  EMAIL_JOB_OTP,
+  EMAIL_JOB_TRIP_REMINDER,
+  EMAIL_JOB_TRIP_STARTED,
+  EMAIL_JOB_WELCOME,
+  EMAIL_QUEUE_NAME,
+} from "../constants/labels.js";
+
+const connection = {
+  host: new URL(env.UPSTASH_REDIS_URL).hostname,
+  port: 6379,
+  password: env.UPSTASH_REDIS_TOKEN,
+  tls: {},
+};
+
+export const emailQueue = new Queue(EMAIL_QUEUE_NAME, { connection });
+
+export const EMAIL_JOBS = {
+  WELCOME: EMAIL_JOB_WELCOME,
+  OTP: EMAIL_JOB_OTP,
+  BOOKING_REQUEST: EMAIL_JOB_BOOKING_REQUEST,
+  BOOKING_CONFIRMATION: EMAIL_JOB_BOOKING_CONFIRMATION,
+  BOOKING_REJECT: EMAIL_JOB_BOOKING_REJECT,
+  TRIP_REMINDER: EMAIL_JOB_TRIP_REMINDER,
+  TRIP_STARTED: EMAIL_JOB_TRIP_STARTED,
+} as const;

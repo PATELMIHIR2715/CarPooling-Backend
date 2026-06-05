@@ -1,6 +1,9 @@
 import type { Response } from "express";
 
-import { errorResponse } from "../../../utils/error.utils.js";
+import {
+  errorResponseStandard,
+  successResponse,
+} from "../../../utils/response.utils.js";
 import { createCarSchema, type CreateCar } from "./car.validator.js";
 import CarService from "./car.service.js";
 import { uploadToCloudinary } from "../../../utils/upload.utils.js";
@@ -11,6 +14,11 @@ import {
   NO_CARS_FOUND,
   NO_DOCUMENTS_FOUND,
 } from "../../../constants/messages.js";
+import {
+  DRIVER_DOCUMENTS_FOLDER,
+  LICENCE_FIELD,
+  RC_FIELD,
+} from "../../../constants/labels.js";
 
 class CarController {
   async addCar(req: any, res: Response) {
@@ -21,9 +29,9 @@ class CarController {
         throw new Error(INVALID_INPUT);
       }
       const result = await CarService.createCar(data, driverId);
-      res.status(201).json(result);
+      successResponse(res, result, 201);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 
@@ -32,11 +40,11 @@ class CarController {
       const driverId = req.user.userId;
       const cars = await CarService.getCarsByDriver(driverId);
       if (!cars) {
-        return res.status(404).json({ error: NO_CARS_FOUND });
+        return errorResponseStandard(new Error(NO_CARS_FOUND), res, 404);
       }
-      res.status(200).json(cars);
+      successResponse(res, cars, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 
@@ -44,31 +52,35 @@ class CarController {
     try {
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
-      if (!files || !files["licence"] || !files["rc"]) {
-        return res.status(400).json({ error: ALL_DOCUMENTS_REQUIRED });
+      if (!files || !files[LICENCE_FIELD] || !files[RC_FIELD]) {
+        return errorResponseStandard(
+          new Error(ALL_DOCUMENTS_REQUIRED),
+          res,
+          400
+        );
       }
 
-      const licenseFile = files["licence"] && files["licence"][0];
-      const rcFile = files["rc"] && files["rc"][0];
+      const licenseFile = files[LICENCE_FIELD] && files[LICENCE_FIELD][0];
+      const rcFile = files[RC_FIELD] && files[RC_FIELD][0];
       if (!licenseFile || !rcFile) {
-        return errorResponse(new Error(DOCUMENTS_REQUIRED), res, 400);
+        return errorResponseStandard(new Error(DOCUMENTS_REQUIRED), res, 400);
       }
       const userId = req.user.userId;
 
       const licenseUrl = await uploadToCloudinary(
         licenseFile.buffer,
-        "documents/drivers",
+        DRIVER_DOCUMENTS_FOLDER,
         `${userId}_license`
       );
       const rcUrl = await uploadToCloudinary(
         rcFile.buffer,
-        "documents/drivers",
+        DRIVER_DOCUMENTS_FOLDER,
         `${userId}_rc`
       );
       const result = await CarService.uploadDocument(userId, licenseUrl, rcUrl);
-      res.status(201).json(result);
+      successResponse(res, result, 201);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 
@@ -76,11 +88,11 @@ class CarController {
     try {
       const document = await CarService.getDucumentsByDriver(req.user.userId);
       if (!document) {
-        return errorResponse(new Error(NO_DOCUMENTS_FOUND), res, 404);
+        return errorResponseStandard(new Error(NO_DOCUMENTS_FOUND), res, 404);
       }
-      res.status(200).json(document);
+      successResponse(res, document, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 }

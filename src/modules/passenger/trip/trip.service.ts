@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import prisma from "../../../config/database.js";
 import { CANCELLED, COMPLETED } from "../../../constants/labels.js";
 import {
@@ -8,41 +9,111 @@ import {
   TRIP_NOT_FOUND,
 } from "../../../constants/messages.js";
 import type { TUser } from "../../../constants/types.js";
+import {
+  findNearestPickupPoint,
+  haversineDistance,
+  type LocationPoint,
+} from "../../../utils/location.utils.js";
 import type { BookTripInput, SearchTripInput } from "./trip.validator.js";
+import { buildPaginationMeta } from "../../../utils/buildquery.utils.js";
+
+const SEARCH_THRESHOLD_KM = 5;
+const BOOKING_THRESHOLD_KM = 2;
+const SAME_LOCATION_THRESHOLD_KM = 0.5;
+
+const isLocationPoint = (value: unknown): value is LocationPoint => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const point = value as Partial<LocationPoint>;
+  return (
+    typeof point.name === "string" &&
+    typeof point.lat === "number" &&
+    typeof point.lon === "number"
+  );
+};
+
+const toPickupPoints = (pickupLocations: unknown[]): LocationPoint[] =>
+  pickupLocations.filter(isLocationPoint);
+
+const getDestinationPoint = (trip: {
+  destinationLocation: string;
+  destinationLat: number | null;
+  destinationLon: number | null;
+}): LocationPoint | null => {
+  if (trip.destinationLat === null || trip.destinationLon === null) {
+    return null;
+  }
+
+  return {
+    name: trip.destinationLocation,
+    lat: trip.destinationLat,
+    lon: trip.destinationLon,
+  };
+};
 
 class TripService {
-  async getTripsBySearch(data: SearchTripInput) {
-    const trips = await prisma.ride.findMany({
-      where: {
-        AND: [
-          { status: { notIn: [CANCELLED, COMPLETED] } },
-          { availableSeats: { gte: data.seats ?? 1 } },
-          { departureTime: { gte: new Date(data.dateAndTime) } },
+  async getTripsBySearch(data: SearchTripInput, filter: any) {
+    const [trips, total] = await prisma.$transaction([
+      prisma.ride.findMany({
+        ...filter,
+        where: {
+          ...filter.where,
+          AND: [
+            { status: { notIn: [CANCELLED, COMPLETED] } },
+            { availableSeats: { gte: data.seats ?? 1 } },
+            { departureTime: { gte: new Date(data.dateAndTime) } },
+          ],
+        },
+        include: {
+          driver: { select: { name: true, email: true, phone: true } },
+          car: true,
+        },
+      }),
+      prisma.ride.count({
+        where: filter.where,
+      }),
+    ]);
+    return {
+      data: trips.filter((trip) => {
+        const pickupPoints = toPickupPoints(trip.pickupLocations);
+        const destinationPoint = getDestinationPoint(trip);
 
+        if (!destinationPoint) {
+          return false;
+        }
+
+        const allPickupPoints = [
+          ...pickupPoints,
           {
-            OR: [
-              { origin: { contains: data.origin.name, mode: "insensitive" } },
-              { pickupLocations: { has: data.origin.name } },
-            ],
+            name: trip.origin,
+            lat: trip.originLat ?? 0,
+            lon: trip.originLon ?? 0,
           },
-          {
-            OR: [
-              {
-                destinationLocation: {
-                  contains: data.destination.name,
-                  mode: "insensitive",
-                },
-              },
-            ],
-          },
-        ],
-      },
-      include: {
-        driver: { select: { name: true, email: true, phone: true } },
-        car: true,
-      },
-    });
-    return trips;
+        ];
+
+        const originMatch = findNearestPickupPoint(
+          data.origin,
+          allPickupPoints,
+          SEARCH_THRESHOLD_KM
+        ).isNear;
+        const destinationMatch =
+          haversineDistance(
+            data.destination.lat,
+            data.destination.lon,
+            destinationPoint.lat,
+            destinationPoint.lon
+          ) <= SEARCH_THRESHOLD_KM;
+
+        return originMatch && destinationMatch;
+      }),
+      meta: buildPaginationMeta(
+        total,
+        Math.ceil(filter.skip / filter.take) + 1,
+        filter.take
+      ),
+    };
   }
   async bookTrip(bookingData: BookTripInput, user: TUser, tripId: string) {
     const trip = await prisma.ride.findUnique({
@@ -67,18 +138,40 @@ class TripService {
       throw new Error(NOT_ENOUGH_SEATS);
     }
 
-    // Valid locations
-    const validLocations = [...trip.pickupLocations, trip.destinationLocation];
+    const pickupPoints = toPickupPoints(trip.pickupLocations);
 
-    // Pickup validation
-    const isValidPickup = validLocations.includes(bookingData.pickupLocation);
+    const allPickupPoints = [
+      ...pickupPoints,
+      {
+        name: trip.origin,
+        lat: trip.originLat ?? 0,
+        lon: trip.originLon ?? 0,
+      },
+    ];
+    const destinationPoint = getDestinationPoint(trip);
+    const dropoffPoints = destinationPoint
+      ? [...allPickupPoints, destinationPoint]
+      : allPickupPoints;
 
-    // Dropoff validation
-    const isValidDropoff = validLocations.includes(bookingData.dropoffLocation);
+    const isValidPickup = findNearestPickupPoint(
+      bookingData.pickupLocation,
+      allPickupPoints,
+      BOOKING_THRESHOLD_KM
+    ).isNear;
 
-    // Same pickup & dropoff check
+    const isValidDropoff = findNearestPickupPoint(
+      bookingData.dropoffLocation,
+      dropoffPoints,
+      BOOKING_THRESHOLD_KM
+    ).isNear;
+
     const isSameLocation =
-      bookingData.pickupLocation === bookingData.dropoffLocation;
+      haversineDistance(
+        bookingData.pickupLocation.lat,
+        bookingData.pickupLocation.lon,
+        bookingData.dropoffLocation.lat,
+        bookingData.dropoffLocation.lon
+      ) < SAME_LOCATION_THRESHOLD_KM;
 
     if (!isValidPickup || !isValidDropoff) {
       throw new Error(PICKUP_DROPOFF_LOCATION_INVALID);
@@ -95,8 +188,8 @@ class TripService {
           price: trip.price * bookingData.seats,
           passengerName: user.name,
           seatBooked: bookingData.seats,
-          dropoffLocation: bookingData.dropoffLocation,
-          pickupLocation: bookingData.pickupLocation,
+          dropoffLocation: bookingData.dropoffLocation.name,
+          pickupLocation: bookingData.pickupLocation.name,
         },
       }),
       prisma.ride.update({
