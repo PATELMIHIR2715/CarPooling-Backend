@@ -1,5 +1,3 @@
-import { Prisma, type Ride } from "@prisma/client";
-
 import prisma from "../../../config/database.js";
 import {
   APPROVED,
@@ -72,7 +70,7 @@ class TripService {
       carId: car.id,
       driverId,
       price: data.price,
-      pickupLocations: (data.pickupLocations ?? []) as Prisma.InputJsonValue[],
+      pickupLocations: data.pickupLocations ?? [],
       destinationLocation: data.destination.name,
       destinationLat: data.destination.lat,
       destinationLon: data.destination.lon,
