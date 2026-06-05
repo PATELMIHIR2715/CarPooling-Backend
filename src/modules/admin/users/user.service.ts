@@ -1,8 +1,9 @@
 import type { Prisma, Role } from "@prisma/client";
 
 import prisma from "../../../config/database.js";
-import { USER_NOT_FOUND } from "../../../constants/messages.js";
+import { USER_NOT_FOUND, USERS_NOT_FOUND } from "../../../constants/messages.js";
 import redis from "../../../config/redis.js";
+import { RESTRICTED_USERS_SET } from "../../../constants/labels.js";
 import {
   buildPaginationMeta,
   type FilterInput,
@@ -49,7 +50,7 @@ class AdminUserService {
       where: { id: userId },
     });
     if (!user) {
-      throw new Error("Users not found");
+      throw new Error(USERS_NOT_FOUND);
     }
     return user;
   }
@@ -65,7 +66,7 @@ class AdminUserService {
       });
 
     // Add user ID to Redis set for restricted users
-    await redis.sadd("restricted_users", userId);
+    await redis.sadd(RESTRICTED_USERS_SET, userId);
 
     return updatedUser;
   }
@@ -81,7 +82,7 @@ class AdminUserService {
       });
 
     // Remove user ID from Redis set for restricted users
-    await redis.srem("restricted_users", userId);
+    await redis.srem(RESTRICTED_USERS_SET, userId);
 
     return updatedUser;
   }

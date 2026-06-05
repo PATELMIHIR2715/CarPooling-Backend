@@ -1,4 +1,11 @@
 import prisma from "../../../config/database.js";
+import {
+  APPROVED,
+  LICENCE_DOCUMENT,
+  PENDING,
+  RC_DOCUMENT,
+  REJECTED,
+} from "../../../constants/labels.js";
 import type { TDocumentStatus } from "../../../constants/types.js";
 import {
   buildFilterQuery,
@@ -33,11 +40,11 @@ class DocumentsService {
 
   async updateDocumentStatus(
     documentId: string,
-    type: "RC" | "LICENCE",
+    type: typeof RC_DOCUMENT | typeof LICENCE_DOCUMENT,
     status: TDocumentStatus
   ) {
     const updateData =
-      type === "RC" ? { rcStatus: status } : { licenceStatus: status };
+      type === RC_DOCUMENT ? { rcStatus: status } : { licenceStatus: status };
 
     const updatedDocument = await prisma.document.update({
       where: { id: documentId },
@@ -47,8 +54,8 @@ class DocumentsService {
       where: {
         id: documentId,
         OR: [
-          { rcStatus: { in: ["PENDING", "REJECTED"] } },
-          { licenceStatus: { in: ["PENDING", "REJECTED"] } },
+          { rcStatus: { in: [PENDING, REJECTED] } },
+          { licenceStatus: { in: [PENDING, REJECTED] } },
         ],
       },
     });
@@ -60,7 +67,7 @@ class DocumentsService {
       });
       const document = await prisma.document.update({
         where: { id: documentId },
-        data: { status: "APPROVED" },
+        data: { status: APPROVED },
       });
       return document;
     }

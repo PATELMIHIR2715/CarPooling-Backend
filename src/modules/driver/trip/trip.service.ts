@@ -1,8 +1,18 @@
 import { Prisma, type Ride } from "@prisma/client";
 
 import prisma from "../../../config/database.js";
-import { CANCELLED, COMPLETED, ONGOING } from "../../../constants/labels.js";
 import {
+  APPROVED,
+  CANCELLED,
+  COMPLETED,
+  ONGOING,
+  PICKEDUP,
+} from "../../../constants/labels.js";
+import {
+  DOCUMENTS_NOT_APPROVED,
+  DRIVER_CAR_NOT_FOUND,
+  INVALID_OTP,
+  OTP_SENT_SUCCESSFULLY,
   OVERLAP_TRIP,
   TRIP_COMPLETED,
   TRIP_NOT_FOUND,
@@ -28,18 +38,18 @@ class TripService {
       where: {
         userId: driverId,
         OR: [
-          { rcStatus: { not: "APPROVED" } },
-          { licenceStatus: { not: "APPROVED" } },
+          { rcStatus: { not: APPROVED } },
+          { licenceStatus: { not: APPROVED } },
         ],
       },
     });
 
     if (unAproovedDocuments) {
-      throw new Error("Your documents not approved");
+      throw new Error(DOCUMENTS_NOT_APPROVED);
     }
 
     if (!car) {
-      throw new Error("Driver does not have a car registered");
+      throw new Error(DRIVER_CAR_NOT_FOUND);
     }
     const overLappingTrips = await prisma.ride.findFirst({
       where: {
@@ -155,7 +165,7 @@ class TripService {
       booking.passenger.name,
       otp
     );
-    return { message: "OTP sent successfully" };
+    return { message: OTP_SENT_SUCCESSFULLY };
   }
 
   async verifyPickupOtp(
@@ -178,12 +188,12 @@ class TripService {
     validateVerifyOtp(booking, driverId);
     const valid = await verifyOTP(tripId, booking.passengerId, otp);
     if (!valid) {
-      throw new Error("Invalid OTP");
+      throw new Error(INVALID_OTP);
     }
 
     return await prisma.booking.update({
       where: { id: bookingId },
-      data: { status: "PICKEDUP" },
+      data: { status: PICKEDUP },
     });
   }
 }

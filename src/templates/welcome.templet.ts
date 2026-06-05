@@ -1,3 +1,5 @@
+import { DRIVER_ROLE } from "../constants/labels.js";
+
 export const welcomeTemplate = (name: string, role: string) => `
 <!DOCTYPE html>
 <html>
@@ -9,7 +11,7 @@ export const welcomeTemplate = (name: string, role: string) => `
     <h2>Hi ${name}!</h2>
     <p>Welcome to CarpoolApp! Your account has been created successfully as a <strong>${role}</strong>.</p>
     ${
-      role === "DRIVER"
+      role === DRIVER_ROLE
         ? `
     <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
       <h3>Next Steps:</h3>

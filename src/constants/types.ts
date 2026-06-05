@@ -1,3 +1,12 @@
+import type {
+  APPROVED,
+  END_POINT,
+  PENDING,
+  REJECTED,
+  ROUTE_POINT,
+  START_POINT,
+} from "./labels.js";
+
 export type TCar = {
   make: string;
   model: string;
@@ -25,7 +34,10 @@ export type TRoutePoint = {
   name: string;
   lat: number;
   lon: number;
-  type: "start" | "end" | "route_point";
+  type: typeof START_POINT | typeof END_POINT | typeof ROUTE_POINT;
 };
 
-export type TDocumentStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type TDocumentStatus =
+  | typeof PENDING
+  | typeof APPROVED
+  | typeof REJECTED;

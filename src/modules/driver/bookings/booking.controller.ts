@@ -1,23 +1,26 @@
 import type { Response } from "express";
 import bookingService from "./booking.service.js";
-import { errorResponse } from "../../../utils/error.utils.js";
 import { bookingStatusSchema } from "./booking.validator.js";
+import {
+  successResponse,
+  errorResponseStandard,
+} from "../../../utils/response.utils.js";
 
 class BookingController {
   async getBookingsByTripId(req: any, res: Response) {
     try {
-      const tripId = req.params.tripid;
+      const tripId = req.params.tripId ?? req.params.tripid;
       const userId = req.user.userId;
 
       const bookings = await bookingService.getBookingByTrip(tripId, userId);
-      res.status(200).json(bookings);
+      successResponse(res, bookings, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 
   async updateTripStatus(req: any, res: Response) {
-    const bookingId = req.params.bookingid;
+    const bookingId = req.params.bookingId ?? req.params.bookingid;
     const status = req.params.status;
     const userId = req.user.userId;
     try {
@@ -29,9 +32,9 @@ class BookingController {
         bookingStatus.status,
         userId
       );
-      res.status(200).json(result);
+      successResponse(res, result, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 }

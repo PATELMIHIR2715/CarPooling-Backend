@@ -3,11 +3,15 @@ import cors from "cors";
 import "dotenv/config";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
+import helmet from "helmet";
+import compression from "compression";
+import ratelimit from "express-rate-limit";
 
 import { startTripCron } from "./cron/trip.cron.js";
 import { startBookingCron } from "./cron/booking.cron.js";
 import { startWaitlistCron } from "./cron/waitlist.cron.js";
 import env from "./config/env.js";
+import { corsOptions } from "./config/cors.js";
 import prisma from "./config/database.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import carRoutes from "./modules/driver/car/car.routes.js";
@@ -34,8 +38,20 @@ import {
   ADMIN,
   CHAT,
 } from "./constants/routes.js";
+import {
+  CORS_PREFLIGHT_PATH,
+  HEALTH_ROUTE,
+  JSON_LIMIT_1MB,
+} from "./constants/labels.js";
 import { initSocket } from "./socket/socket.js";
 import { startEmailWorker } from "./workers/email.worker.js";
+import { successResponse } from "./utils/response.utils.js";
+import {
+  DATABASE_CONNECTED,
+  DATABASE_CONNECTION_FAILED,
+  SERVER_RUNNING,
+  TOO_MANY_REQUESTS,
+} from "./constants/messages.js";
 // test connection
 
 const app = express();
@@ -43,21 +59,26 @@ const port = env.PORT || 8000;
 const httpServer = createServer(app);
 const io = initSocket(httpServer);
 
-// app.use(cors());
-app.use(
-  cors({
-    origin: "*", // or specifically "http://localhost:5173"
-    credentials: true,
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "ngrok-skip-browser-warning",
-    ],
-  })
-);
-app.options("{*path}", cors());
+const genralRateLimiter = ratelimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: TOO_MANY_REQUESTS },
+});
+
+const authLimiter = ratelimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: TOO_MANY_REQUESTS },
+});
+
+app.use(cors(corsOptions));
+app.use(genralRateLimiter);
+app.use(`${API}${AUTH}`, authLimiter);
+app.use(helmet()); // security headers
+app.use(compression());
+app.options(CORS_PREFLIGHT_PATH, cors(corsOptions));
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({ limit: JSON_LIMIT_1MB }));
 app.use(`${API}${AUTH}`, authRoutes);
 app.use(`${API}${CAR}`, carRoutes);
 app.use(`${API}${TRIP}`, tripRoutes);
@@ -71,11 +92,8 @@ app.use(`${API}${ADMIN}`, dashboardRoutes);
 app.use(`${API}${ADMIN}`, documentRoutes);
 app.use(`${API}${ADMIN}`, tripRotes);
 app.use(`${API}${CHAT}`, chatRoutes);
-app.get("/health", (_, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Server running",
-  });
+app.get(HEALTH_ROUTE, (_, res) => {
+  successResponse(res, null, SERVER_RUNNING, 200);
 });
 
 httpServer.listen(port, () => {
@@ -84,11 +102,11 @@ httpServer.listen(port, () => {
   prisma
     .$connect()
     .then(() => {
-      console.log("Database connected successfully!");
+      console.log(DATABASE_CONNECTED);
       startTripCron();
       startBookingCron();
       startWaitlistCron();
       startEmailWorker();
     })
-    .catch((err) => console.error("Database connection failed:", err));
+    .catch((err) => console.error(DATABASE_CONNECTION_FAILED, err));
 });

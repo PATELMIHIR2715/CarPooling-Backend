@@ -1,4 +1,20 @@
-import { REQUEST_FAILED, ROUTE_NOT_FOUND } from "../../constants/messages.js";
+import {
+  HTTP_ERROR_PREFIX,
+  REQUEST_FAILED,
+  ROUTE_NOT_FOUND,
+} from "../../constants/messages.js";
+import {
+  CARPOOL_APP_USER_AGENT,
+  END_POINT,
+  ROAD_ROUTE_WORD,
+  ROUTE_POINT,
+  SERVICE_ROAD_ROUTE_WORD,
+  START_POINT,
+  STREET_ROUTE_WORD,
+  UNKNOWN_ROUTE_WORD,
+  UNNAMED_ROUTE_WORD,
+  USER_AGENT_HEADER,
+} from "../../constants/labels.js";
 import type { TLocationPoint, TRoutePoint } from "../../constants/types.js";
 
 class LocationService {
@@ -26,7 +42,7 @@ class LocationService {
         clearTimeout(timeout);
 
         if (!response.ok) {
-          throw new Error(`HTTP Error: ${response.status}`);
+          throw new Error(`${HTTP_ERROR_PREFIX} ${response.status}`);
         }
 
         return response.json();
@@ -50,7 +66,7 @@ class LocationService {
       )}&format=json&countrycodes=in&limit=10`,
       {
         headers: {
-          "User-Agent": "CarpoolApp/1.0",
+          [USER_AGENT_HEADER]: CARPOOL_APP_USER_AGENT,
         },
       }
     );
@@ -91,11 +107,11 @@ class LocationService {
 
     // Remove useless names
     const blockedWords = [
-      "unnamed",
-      "road",
-      "street",
-      "service road",
-      "unknown",
+      UNNAMED_ROUTE_WORD,
+      ROAD_ROUTE_WORD,
+      STREET_ROUTE_WORD,
+      SERVICE_ROAD_ROUTE_WORD,
+      UNKNOWN_ROUTE_WORD,
     ];
 
     return (
@@ -154,7 +170,7 @@ class LocationService {
           name,
           lat,
           lon,
-          type: "route_point",
+          type: ROUTE_POINT,
         });
       }
     }
@@ -168,21 +184,21 @@ class LocationService {
     // Final Response
     return [
       {
-        id: "start",
+        id: START_POINT,
         name: start.name,
         lat: start.lat,
         lon: start.lon,
-        type: "start",
+        type: START_POINT,
       },
 
       ...limitedPoints,
 
       {
-        id: "end",
+        id: END_POINT,
         name: end.name,
         lat: end.lat,
         lon: end.lon,
-        type: "end",
+        type: END_POINT,
       },
     ];
   }

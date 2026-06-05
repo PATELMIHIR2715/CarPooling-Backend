@@ -2,6 +2,11 @@ import cron from "node-cron";
 
 import { COMPLETED, ONGOING, SCHEDULED } from "../constants/labels.js";
 import prisma from "../config/database.js";
+import {
+  TRIP_CRON_ERROR,
+  TRIP_CRON_STARTED,
+  TRIP_STATUS_CRON_UPDATED,
+} from "../constants/messages.js";
 
 export const startTripCron = () => {
   cron.schedule("* * * * *", async () => {
@@ -17,10 +22,10 @@ export const startTripCron = () => {
         where: { status: ONGOING, endTime: { lte: now } },
         data: { status: COMPLETED },
       });
-      console.log("Trip status updated by cron job at", now.toISOString());
+      console.log(TRIP_STATUS_CRON_UPDATED, now.toISOString());
     } catch (error) {
-      console.error("Error starting trip cron job:", error);
+      console.error(TRIP_CRON_ERROR, error);
     }
   });
-  console.log("Trip cron job started");
+  console.log(TRIP_CRON_STARTED);
 };

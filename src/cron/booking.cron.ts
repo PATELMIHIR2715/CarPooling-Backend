@@ -1,6 +1,11 @@
 import cron from "node-cron";
 import prisma from "../config/database.js";
 import { CANCELLED, COMPLETED, ONGOING, PENDING } from "../constants/labels.js";
+import {
+  BOOKING_CRON_CLEANED,
+  BOOKING_CRON_ERROR,
+  BOOKING_CRON_STARTED,
+} from "../constants/messages.js";
 
 export const startBookingCron = () => {
   cron.schedule("0 * * * *", async () => {
@@ -13,12 +18,12 @@ export const startBookingCron = () => {
         data: { status: CANCELLED },
       });
       console.log(
-        "Booking entries cleaned up by cron job at",
+        BOOKING_CRON_CLEANED,
         new Date().toISOString()
       );
     } catch (error) {
-      console.error("Error starting booking cron job:", error);
+      console.error(BOOKING_CRON_ERROR, error);
     }
   });
-  console.log("Booking cron job started");
+  console.log(BOOKING_CRON_STARTED);
 };

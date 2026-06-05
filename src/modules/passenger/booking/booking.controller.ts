@@ -1,16 +1,19 @@
 import type { Response } from "express";
 
-import { errorResponse } from "../../../utils/error.utils.js";
 import passengerBookingService from "./booking.service.js";
+import {
+  errorResponseStandard,
+  successResponse,
+} from "../../../utils/response.utils.js";
 
 class PassengerBookingController {
   async getAllBookings(req: any, res: Response) {
     try {
       const userId = req.user.userId;
       const bookings = await passengerBookingService.getAllBookings(userId);
-      res.status(200).json({ bookings });
+      successResponse(res, { bookings }, 200);
     } catch (error) {
-      errorResponse(error, res, 500);
+      errorResponseStandard(error, res, 500);
     }
   }
 
@@ -22,9 +25,9 @@ class PassengerBookingController {
         bookingId,
         userId
       );
-      res.status(200).json({ booking: cancelledBooking });
+      successResponse(res, { booking: cancelledBooking }, 200);
     } catch (error) {
-      errorResponse(error, res, 500);
+      errorResponseStandard(error, res, 500);
     }
   }
 
@@ -38,9 +41,9 @@ class PassengerBookingController {
         userId,
         bookingData
       );
-      res.status(200).json({ waitlistEntry });
+      successResponse(res, { waitlistEntry }, 201);
     } catch (error) {
-      errorResponse(error, res, 500);
+      errorResponseStandard(error, res, 500);
     }
   }
 }

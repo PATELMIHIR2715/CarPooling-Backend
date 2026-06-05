@@ -13,7 +13,7 @@ export const generateTokens = (userId: string, role: string, name: string) => {
 };
 
 export const generateAccessToken = (userId: string, role: string, name: string) =>
-  jwt.sign({ userId, role, name }, env.JWT_SECRET, { expiresIn: "600m" });
+  jwt.sign({ userId, role, name }, env.JWT_SECRET, { expiresIn: "60m" });
 
 export const verifyAccessToken = (token: string) =>
   jwt.verify(token, env.JWT_SECRET);

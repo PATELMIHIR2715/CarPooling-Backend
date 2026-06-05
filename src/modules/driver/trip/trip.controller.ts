@@ -1,9 +1,12 @@
 import type { Response } from "express";
 
-import { errorResponse } from "../../../utils/error.utils.js";
 import { INVALID_INPUT } from "../../../constants/messages.js";
 import { createTripShema, type CreateTrip } from "./trip.validator.js";
 import tripService from "./trip.service.js";
+import {
+  errorResponseStandard,
+  successResponse,
+} from "../../../utils/response.utils.js";
 
 class TripController {
   async createTrip(req: any, res: Response) {
@@ -14,9 +17,9 @@ class TripController {
         throw new Error(INVALID_INPUT);
       }
       const trip = await tripService.createTrip(driverId, data);
-      res.status(201).json(trip);
+      successResponse(res, trip, 201);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 
@@ -24,19 +27,19 @@ class TripController {
     try {
       const driverId = req.user.userId;
       const trips = await tripService.getTripsByDriver(driverId);
-      res.status(200).json(trips);
+      successResponse(res, trips, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 
   async getTripById(req: any, res: Response) {
     try {
-      const tripId = req.params.tripid;
+      const tripId = req.params.tripId ?? req.params.tripid;
       const trip = await tripService.getTripById(tripId);
-      res.status(200).json(trip);
+      successResponse(res, trip, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 
@@ -45,9 +48,9 @@ class TripController {
       const tripId = req.params.tripId;
       const userId = req.user.userId;
       const trip = await tripService.startTrip(tripId, userId);
-      res.status(200).json(trip);
+      successResponse(res, trip, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 
@@ -58,9 +61,9 @@ class TripController {
       const bookingId = req.params.bookingId;
 
       const trip = await tripService.sendPickupOtp(tripId, bookingId, userId);
-      res.status(200).json(trip);
+      successResponse(res, trip, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 
@@ -76,9 +79,9 @@ class TripController {
         otp,
         userId
       );
-      res.status(200).json(trip);
+      successResponse(res, trip, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 }

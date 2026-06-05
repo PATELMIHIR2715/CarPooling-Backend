@@ -1,14 +1,17 @@
 import type { Response } from "express";
 import dashboardService from "./dashboard.service.js";
-import { errorResponse } from "../../../utils/error.utils.js";
+import {
+  errorResponseStandard,
+  successResponse,
+} from "../../../utils/response.utils.js";
 
 class DashboardController {
   async getStats(req: any, res: Response) {
     try {
       const data = await dashboardService.getDashboardData();
-      res.status(200).json(data);
+      successResponse(res, data, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 }

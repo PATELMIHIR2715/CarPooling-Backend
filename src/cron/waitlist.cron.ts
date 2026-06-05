@@ -8,6 +8,11 @@ import {
   SCHEDULED,
   WAITING,
 } from "../constants/labels.js";
+import {
+  WAITLIST_CRON_CLEANED,
+  WAITLIST_CRON_ERROR,
+  WAITLIST_CRON_STARTED,
+} from "../constants/messages.js";
 
 export const startWaitlistCron = () => {
   cron.schedule("*/10 * * * *", async () => {
@@ -72,12 +77,12 @@ export const startWaitlistCron = () => {
       }
 
       console.log(
-        "Waitlist entries cleaned up by cron job at",
+        WAITLIST_CRON_CLEANED,
         new Date().toISOString()
       );
     } catch (error) {
-      console.error("Error in waitlist cron job:", error);
+      console.error(WAITLIST_CRON_ERROR, error);
     }
   });
-  console.log("Waitlist cron job started");
+  console.log(WAITLIST_CRON_STARTED);
 };

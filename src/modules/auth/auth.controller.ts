@@ -1,7 +1,12 @@
 import type { Request, Response } from "express";
 
 import env from "../../config/env.js";
-import { errorResponse } from "../../utils/error.utils.js";
+import {
+  NODE_ENV_PRODUCTION,
+  REFRESH_TOKEN_COOKIE,
+  SAME_SITE_LAX,
+  SAME_SITE_NONE,
+} from "../../constants/labels.js";
 import {
   loginSchema,
   registerSchema,
@@ -10,6 +15,10 @@ import {
 } from "./auth.validator.js";
 import { INVALID_INPUT } from "../../constants/messages.js";
 import AuthService from "./auth.service.js";
+import {
+  successResponse,
+  errorResponseStandard,
+} from "../../utils/response.utils.js";
 
 class AuthController {
   async register(req: Request, res: Response) {
@@ -22,14 +31,16 @@ class AuthController {
 
       const result = await AuthService.registerUser(data);
 
-      res.cookie("refreshToken", result.tokens.refreshToken, {
+      res.cookie(REFRESH_TOKEN_COOKIE, result.tokens.refreshToken, {
         httpOnly: true,
-        secure: env.NODE_ENV === "production",
+        secure: env.NODE_ENV === NODE_ENV_PRODUCTION,
+        sameSite:
+          env.NODE_ENV === NODE_ENV_PRODUCTION ? SAME_SITE_NONE : SAME_SITE_LAX,
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
-      res.status(201).json(result);
+      successResponse(res, result, 201);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 
@@ -43,14 +54,16 @@ class AuthController {
 
       const result = await AuthService.loginUser(data);
 
-      res.cookie("refreshToken", result.tokens.refreshToken, {
+      res.cookie(REFRESH_TOKEN_COOKIE, result.tokens.refreshToken, {
         httpOnly: true,
-        secure: env.NODE_ENV === "production",
+        secure: env.NODE_ENV === NODE_ENV_PRODUCTION,
+        sameSite:
+          env.NODE_ENV === NODE_ENV_PRODUCTION ? SAME_SITE_NONE : SAME_SITE_LAX,
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
-      res.status(200).json(result);
+      successResponse(res, result, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 
@@ -60,9 +73,9 @@ class AuthController {
         req.body.refreshToken as string
       );
 
-      res.status(200).json({ accessToken: result });
+      successResponse(res, { accessToken: result }, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 }

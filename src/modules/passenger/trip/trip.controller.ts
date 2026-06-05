@@ -1,9 +1,12 @@
 import type { Response } from "express";
-import { errorResponse } from "../../../utils/error.utils.js";
 import tripService from "./trip.service.js";
 import { bookTripSchema, searchTripSchema } from "./trip.validator.js";
 import { buildFilterQuery } from "../../../utils/buildquery.utils.js";
 import { TRIP_FILTERS } from "../../../filters/trip.filter.js";
+import {
+  errorResponseStandard,
+  successResponse,
+} from "../../../utils/response.utils.js";
 
 class PassengerTripController {
   async getTripsBySearch(req: any, res: Response) {
@@ -11,9 +14,9 @@ class PassengerTripController {
       const data = searchTripSchema.parse(req.body);
       const filter = buildFilterQuery(req.body, TRIP_FILTERS);
       const trips = await tripService.getTripsBySearch(data, filter);
-      res.status(200).json(trips);
+      successResponse(res, trips, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 
@@ -25,9 +28,9 @@ class PassengerTripController {
 
       const data = bookTripSchema.parse(bookingData);
       const booking = await tripService.bookTrip(data, user, tripId);
-      res.status(200).json(booking);
+      successResponse(res, booking, 201);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 }

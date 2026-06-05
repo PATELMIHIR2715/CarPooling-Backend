@@ -1,3 +1,12 @@
+import {
+  FILTER_FROM,
+  FILTER_INSENSITIVE,
+  FILTER_MAX,
+  FILTER_MIN,
+  FILTER_TO,
+  SORT_DESC,
+} from "../constants/labels.js";
+
 export interface PaginationInput {
   page?: number;
   limit?: number;
@@ -39,7 +48,7 @@ const buildFieldFilter = (key: string, value: any): Record<string, any> => {
   if (
     value &&
     typeof value === "object" &&
-    ("min" in value || "max" in value)
+    (FILTER_MIN in value || FILTER_MAX in value)
   ) {
     const range: Record<string, any> = {};
     if (value.min !== undefined) range.gte = value.min;
@@ -51,7 +60,7 @@ const buildFieldFilter = (key: string, value: any): Record<string, any> => {
   if (
     value &&
     typeof value === "object" &&
-    ("from" in value || "to" in value)
+    (FILTER_FROM in value || FILTER_TO in value)
   ) {
     const range: Record<string, any> = {};
     if (value.from) range.gte = new Date(value.from);
@@ -82,7 +91,7 @@ const buildSearchFilter = (
 ): Record<string, any> => {
   return {
     OR: searchFields.map((field) => ({
-      [field]: { contains: search, mode: "insensitive" },
+      [field]: { contains: search, mode: FILTER_INSENSITIVE },
     })),
   };
 };
@@ -104,7 +113,7 @@ export const buildFilterQuery = (
   // Build orderBy
   const orderBy = input.sort
     ? { [input.sort.field]: input.sort.order }
-    : { createdAt: "desc" };
+    : { createdAt: SORT_DESC };
 
   // Build where clause
   const where: Record<string, any> = {};

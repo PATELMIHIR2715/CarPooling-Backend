@@ -1,14 +1,17 @@
 import type { Response } from "express";
 import documentsService from "./documents.service.js";
-import { errorResponse } from "../../../utils/error.utils.js";
+import {
+  successResponse,
+  errorResponseStandard,
+} from "../../../utils/response.utils.js";
 
 class DocumentsController {
   async getDocuments(req: any, res: Response) {
     try {
       const documents = await documentsService.getDocuments(req.body);
-      res.status(200).json(documents);
+      successResponse(res, documents, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 
@@ -22,9 +25,9 @@ class DocumentsController {
         type,
         status
       );
-      res.status(200).json(updatedDocument);
+      successResponse(res, updatedDocument, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 }

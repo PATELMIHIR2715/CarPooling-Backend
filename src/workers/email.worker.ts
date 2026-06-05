@@ -10,6 +10,19 @@ import {
   bookingRequestTemplate,
 } from "../templates/booking.templet.js";
 import { tripStartedTemplate } from "../templates/trip.templets.js";
+import { EMAIL_QUEUE_NAME } from "../constants/labels.js";
+import {
+  EMAIL_JOB_COMPLETED,
+  EMAIL_JOB_COMPLETED_FOR,
+  EMAIL_JOB_FAILED,
+  EMAIL_SUBJECT_BOOKING_CONFIRMED,
+  EMAIL_SUBJECT_BOOKING_REJECTED,
+  EMAIL_SUBJECT_BOOKING_REQUEST,
+  EMAIL_SUBJECT_OTP,
+  EMAIL_SUBJECT_TRIP_STARTED,
+  EMAIL_SUBJECT_WELCOME,
+  EMAIL_WORKER_STARTED,
+} from "../constants/messages.js";
 
 const connection = {
   host: new URL(env.UPSTASH_REDIS_URL!).hostname,
@@ -20,7 +33,7 @@ const connection = {
 
 export const startEmailWorker = () => {
   const worker = new Worker(
-    "email",
+    EMAIL_QUEUE_NAME,
     async (job) => {
       const { data } = job;
 
@@ -28,14 +41,14 @@ export const startEmailWorker = () => {
         case EMAIL_JOBS.WELCOME:
           await sendEmail(
             data.to,
-            "Welcome to Carpooling App!",
+            EMAIL_SUBJECT_WELCOME,
             welcomeTemplate(data.name, data.role)
           );
           break;
         case EMAIL_JOBS.TRIP_STARTED:
           await sendEmail(
             data.to,
-            "Your Trip Has Started! 🚗",
+            EMAIL_SUBJECT_TRIP_STARTED,
             tripStartedTemplate(
               data.name,
               data.driverName,
@@ -43,17 +56,18 @@ export const startEmailWorker = () => {
               data.destination
             )
           );
+          break;
         case EMAIL_JOBS.OTP:
           await sendEmail(
             data.to,
-            "Your OTP Code",
+            EMAIL_SUBJECT_OTP,
             otpTemplate(data.name, data.otp)
           );
           break;
         case EMAIL_JOBS.BOOKING_REQUEST:
           await sendEmail(
             data.to,
-            "New Booking Request",
+            EMAIL_SUBJECT_BOOKING_REQUEST,
             bookingRequestTemplate(
               data.driverName,
               data.passengerName,
@@ -67,7 +81,7 @@ export const startEmailWorker = () => {
         case EMAIL_JOBS.BOOKING_CONFIRMATION:
           await sendEmail(
             data.to,
-            "Booking Confirmed! 🎉",
+            EMAIL_SUBJECT_BOOKING_CONFIRMED,
             bookingAcceptedTemplate(
               data.passengerName,
               data.driverName,
@@ -80,7 +94,7 @@ export const startEmailWorker = () => {
         case EMAIL_JOBS.BOOKING_REJECT:
           await sendEmail(
             data.to,
-            "Booking Rejected",
+            EMAIL_SUBJECT_BOOKING_REJECTED,
             bookingRejectedTemplate(
               data.passengerName,
               data.origin,
@@ -89,19 +103,19 @@ export const startEmailWorker = () => {
           );
           break;
       }
-      console.log(`Email job ${job.name} completed for ${data.to}`);
+      console.log(`${EMAIL_JOB_COMPLETED_FOR} ${job.name}: ${data.to}`);
     },
     { connection }
   );
 
   worker.on("completed", (job) => {
-    console.log(`Email job ${job.id} completed`);
+    console.log(`${EMAIL_JOB_COMPLETED}: ${job.id}`);
   });
 
   worker.on("failed", (job, err) => {
-    console.error(`Email job ${job?.id} failed: ${err.message}`);
+    console.error(`${EMAIL_JOB_FAILED}: ${job?.id}: ${err.message}`);
   });
-  console.log("Email worker started");
+  console.log(EMAIL_WORKER_STARTED);
 
   return worker;
 };

@@ -4,6 +4,12 @@ import {
   buildPaginationMeta,
   type FilterInput,
 } from "../../utils/buildquery.utils.js";
+import {
+  BOOKING_ACCESS_DENIED,
+  BOOKING_NOT_FOUND,
+  CHAT_ACCESS_DENIED,
+} from "../../constants/messages.js";
+import { SORT_DESC } from "../../constants/labels.js";
 
 class ChatService {
   async createChat(rideId: string, driverId: string, passengerId: string) {
@@ -34,10 +40,10 @@ class ChatService {
       include: { ride: true },
     });
     if (!booking) {
-      throw new Error("Booking not found");
+      throw new Error(BOOKING_NOT_FOUND);
     }
     if (booking.ride.driverId !== userId && booking.passengerId !== userId) {
-      throw new Error("You are not part of this booking");
+      throw new Error(BOOKING_ACCESS_DENIED);
     }
 
     return this.createChat(
@@ -54,7 +60,7 @@ class ChatService {
     });
 
     if (!chat) {
-      throw new Error("Chat not found or access denied");
+      throw new Error(CHAT_ACCESS_DENIED);
     }
 
     const [messages, totalMessages] = await prisma.$transaction([
@@ -86,7 +92,7 @@ class ChatService {
         },
         include: {
           message: {
-            orderBy: { createdAt: "desc" },
+            orderBy: { createdAt: SORT_DESC },
             take: 1,
           },
           sender: {

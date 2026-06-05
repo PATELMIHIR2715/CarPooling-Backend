@@ -1,15 +1,18 @@
 import type { Response } from "express";
 import chatService from "./chat.service.js";
-import { errorResponse } from "../../utils/error.utils.js";
+import {
+  errorResponseStandard,
+  successResponse,
+} from "../../utils/response.utils.js";
 
 class ChatController {
   async getUserChats(req: any, res: Response) {
     try {
       const userId = req.user.userId;
       const chats = await chatService.getUserChats(userId, req.body);
-      res.status(200).json(chats);
+      successResponse(res, chats, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
   async getChatMessages(req: any, res: Response) {
@@ -21,9 +24,9 @@ class ChatController {
         userId,
         req.body
       );
-      res.status(200).json(messages);
+      successResponse(res, messages, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
   async createChat(req: any, res: Response) {
@@ -31,9 +34,9 @@ class ChatController {
       const { bookingId } = req.body;
       const userId = req.user.userId;
       const chat = await chatService.makeChat(bookingId, userId);
-      res.status(200).json(chat);
+      successResponse(res, chat, 200);
     } catch (error) {
-      errorResponse(error, res);
+      errorResponseStandard(error, res);
     }
   }
 }

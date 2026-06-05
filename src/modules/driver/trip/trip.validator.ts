@@ -2,9 +2,10 @@ import { z } from "zod";
 import {
   TRIP_COMPLETED,
   TRIP_NOT_FOUND,
+  TRIP_NOT_SCHEDULED,
   UNAUTHORIZED_ACCESS,
 } from "../../../constants/messages.js";
-import { COMPLETED } from "../../../constants/labels.js";
+import { COMPLETED, SCHEDULED } from "../../../constants/labels.js";
 
 const locationSchema = z.object({
   name: z.string().min(2),
@@ -31,8 +32,8 @@ export const validateStartTrip = (trip: any, userId: string) => {
   if (!trip) {
     throw new Error(TRIP_NOT_FOUND);
   }
-  if (trip.status !== "SCHEDULED") {
-    throw new Error("Trip is not scheduled");
+  if (trip.status !== SCHEDULED) {
+    throw new Error(TRIP_NOT_SCHEDULED);
   }
 };
 
