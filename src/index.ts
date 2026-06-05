@@ -108,5 +108,5 @@ httpServer.listen(port, () => {
       startWaitlistCron();
       startEmailWorker();
     })
-    .catch((err) => console.error(DATABASE_CONNECTION_FAILED, err));
+    .catch((err: unknown) => console.error(DATABASE_CONNECTION_FAILED, err));
 });

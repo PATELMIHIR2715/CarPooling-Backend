@@ -1,5 +1,3 @@
-import { Prisma, type Ride } from "@prisma/client";
-
 import prisma from "../../../config/database.js";
 import {
   APPROVED,
@@ -14,9 +12,7 @@ import {
   INVALID_OTP,
   OTP_SENT_SUCCESSFULLY,
   OVERLAP_TRIP,
-  TRIP_COMPLETED,
   TRIP_NOT_FOUND,
-  UNAUTHORIZED_ACCESS,
 } from "../../../constants/messages.js";
 import {
   validateSendOtp,
@@ -72,7 +68,7 @@ class TripService {
       carId: car.id,
       driverId,
       price: data.price,
-      pickupLocations: (data.pickupLocations ?? []) as Prisma.InputJsonValue[],
+      pickupLocations: data.pickupLocations ?? [],
       destinationLocation: data.destination.name,
       destinationLat: data.destination.lat,
       destinationLon: data.destination.lon,

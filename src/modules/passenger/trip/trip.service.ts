@@ -1,4 +1,3 @@
-import type { Prisma } from "@prisma/client";
 import prisma from "../../../config/database.js";
 import { CANCELLED, COMPLETED } from "../../../constants/labels.js";
 import {
@@ -76,7 +75,7 @@ class TripService {
       }),
     ]);
     return {
-      data: trips.filter((trip) => {
+      data: trips.filter((trip: any) => {
         const pickupPoints = toPickupPoints(trip.pickupLocations);
         const destinationPoint = getDestinationPoint(trip);
 

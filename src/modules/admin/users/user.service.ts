@@ -1,13 +1,13 @@
-import type { Prisma, Role } from "@prisma/client";
+import { type Role } from "@prisma/client";
 
 import prisma from "../../../config/database.js";
-import { USER_NOT_FOUND, USERS_NOT_FOUND } from "../../../constants/messages.js";
+import {
+  USER_NOT_FOUND,
+  USERS_NOT_FOUND,
+} from "../../../constants/messages.js";
 import redis from "../../../config/redis.js";
 import { RESTRICTED_USERS_SET } from "../../../constants/labels.js";
-import {
-  buildPaginationMeta,
-  type FilterInput,
-} from "../../../utils/buildquery.utils.js";
+import { buildPaginationMeta } from "../../../utils/buildquery.utils.js";
 
 class AdminUserService {
   async getAllUsers(usersType: string, filters: any) {
