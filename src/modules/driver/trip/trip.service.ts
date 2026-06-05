@@ -12,9 +12,7 @@ import {
   INVALID_OTP,
   OTP_SENT_SUCCESSFULLY,
   OVERLAP_TRIP,
-  TRIP_COMPLETED,
   TRIP_NOT_FOUND,
-  UNAUTHORIZED_ACCESS,
 } from "../../../constants/messages.js";
 import {
   validateSendOtp,
