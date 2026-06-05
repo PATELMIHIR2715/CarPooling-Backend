@@ -1,3 +1,5 @@
+// Static Routes
+
 export const ROOT = "/";
 export const AUTH = "/auth";
 export const REGISTER = "/register";
@@ -18,20 +20,27 @@ export const BOOKING = "/booking";
 export const LOCATION = "/location";
 export const PASSENGER = "/passenger";
 export const BOOK = "/book";
-export const TRIPID = "/:tripId";
 export const SEARCH = "/search";
 export const ROUTE = "/route";
-export const BOOKINGID = "/:bookingId";
 export const CANCEL = "/cancel";
 export const WAITLIST = "/waitlist";
 export const RATING = "/rating";
-export const USERID = "/:userId";
 export const RESTRICT = "/restrict";
 export const UNRESTRICT = "/unrestrict";
 export const ADMIN = "/admin";
 export const USERS = "/users";
 export const STATS = "/stats";
-export const DOCUMENTID = "/:documentId";
-export const TYPE = "/:type";
-export const STATUS = "/:status";
 export const TRIPS = "/trips";
+export const MESSAGES = "/messages";
+export const CHAT = "/chat";
+export const GET_MY_CHATS = "/get-my-chats";
+
+// Dynamic Routes
+
+export const STATUS = "/:status";
+export const TYPE = "/:type";
+export const DOCUMENTID = "/:documentId";
+export const USERID = "/:userId";
+export const BOOKINGID = "/:bookingId";
+export const CHATID = "/:chatId";
+export const TRIPID = "/:tripId";

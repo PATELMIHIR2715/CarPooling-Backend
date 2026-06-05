@@ -4,7 +4,7 @@ class DashboardService {
   async getDashboardData() {
     const [
       totalUsers,
-      totalPassenger,
+      totalPassengers,
       totalDrivers,
       totalRides,
       completedRides,
@@ -29,7 +29,7 @@ class DashboardService {
     ]);
     return {
       totalUsers,
-      totalPassenger,
+      totalPassengers,
       totalDrivers,
       totalRides,
       completedRides,

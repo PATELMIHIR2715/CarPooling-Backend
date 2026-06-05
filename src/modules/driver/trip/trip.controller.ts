@@ -39,6 +39,48 @@ class TripController {
       errorResponse(error, res);
     }
   }
+
+  async startTrip(req: any, res: Response) {
+    try {
+      const tripId = req.params.tripId;
+      const userId = req.user.userId;
+      const trip = await tripService.startTrip(tripId, userId);
+      res.status(200).json(trip);
+    } catch (error) {
+      errorResponse(error, res);
+    }
+  }
+
+  async sendPickupOtp(req: any, res: Response) {
+    try {
+      const tripId = req.params.tripId;
+      const userId = req.user.userId;
+      const bookingId = req.params.bookingId;
+
+      const trip = await tripService.sendPickupOtp(tripId, bookingId, userId);
+      res.status(200).json(trip);
+    } catch (error) {
+      errorResponse(error, res);
+    }
+  }
+
+  async verifyOtp(req: any, res: Response) {
+    try {
+      const tripId = req.params.tripId;
+      const bookingId = req.params.bookingId;
+      const userId = req.user.userId;
+      const otp = req.body.otp;
+      const trip = await tripService.verifyPickupOtp(
+        tripId,
+        bookingId,
+        otp,
+        userId
+      );
+      res.status(200).json(trip);
+    } catch (error) {
+      errorResponse(error, res);
+    }
+  }
 }
 
 export default new TripController();

@@ -8,3 +8,4 @@ export const ACCEPTED = "ACCEPTED";
 export const DRIVER_ROLE = "DRIVER";
 export const PASSENGER_ROLE = "PASSENGER";
 export const ADMIN_ROLE = "ADMIN";
+export const REJECTED = "REJECTED";

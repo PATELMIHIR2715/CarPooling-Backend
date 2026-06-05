@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import "dotenv/config";
 import cookieParser from "cookie-parser";
+import { createServer } from "http";
 
 import { startTripCron } from "./cron/trip.cron.js";
 import { startBookingCron } from "./cron/booking.cron.js";
@@ -20,6 +21,7 @@ import userRoutes from "./modules/admin/users/user.routes.js";
 import dashboardRoutes from "./modules/admin/dashboard/dashboard.routes.js";
 import documentRoutes from "./modules/admin/documents/documents.routes.js";
 import tripRotes from "./modules/admin/trips/trips.routes.js";
+import chatRoutes from "./modules/chat/chat.routes.js";
 import {
   API,
   AUTH,
@@ -30,11 +32,16 @@ import {
   PASSENGER,
   RATING,
   ADMIN,
+  CHAT,
 } from "./constants/routes.js";
+import { initSocket } from "./socket/socket.js";
+import { startEmailWorker } from "./workers/email.worker.js";
 // test connection
 
 const app = express();
 const port = env.PORT || 8000;
+const httpServer = createServer(app);
+const io = initSocket(httpServer);
 
 // app.use(cors());
 app.use(
@@ -63,6 +70,7 @@ app.use(`${API}${ADMIN}`, userRoutes);
 app.use(`${API}${ADMIN}`, dashboardRoutes);
 app.use(`${API}${ADMIN}`, documentRoutes);
 app.use(`${API}${ADMIN}`, tripRotes);
+app.use(`${API}${CHAT}`, chatRoutes);
 app.get("/health", (_, res) => {
   res.status(200).json({
     success: true,
@@ -70,8 +78,8 @@ app.get("/health", (_, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+httpServer.listen(port, () => {
+  console.log(`io-socket-server running on port ${port}`);
 
   prisma
     .$connect()
@@ -80,6 +88,7 @@ app.listen(port, () => {
       startTripCron();
       startBookingCron();
       startWaitlistCron();
+      startEmailWorker();
     })
     .catch((err) => console.error("Database connection failed:", err));
 });

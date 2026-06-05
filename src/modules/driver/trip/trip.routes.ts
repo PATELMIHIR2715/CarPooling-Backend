@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { BOOKINGS, ROOT } from "../../../constants/routes.js";
+import { BOOKINGID, ROOT, TRIPID } from "../../../constants/routes.js";
 import { authenticate, authorize } from "../../auth/auth.middleware.js";
 import tripController from "./trip.controller.js";
 import { DRIVER_ROLE } from "../../../constants/labels.js";
@@ -21,10 +21,31 @@ router.get(
 );
 
 router.get(
-  `/:tripid`,
+  TRIPID,
   authenticate,
   authorize([DRIVER_ROLE]),
   tripController.getTripById
+);
+
+router.put(
+  `${TRIPID}/start`,
+  authenticate,
+  authorize([DRIVER_ROLE]),
+  tripController.startTrip
+);
+
+router.post(
+  `${TRIPID}/pickup${BOOKINGID}`,
+  authenticate,
+  authorize([DRIVER_ROLE]),
+  tripController.sendPickupOtp
+);
+
+router.post(
+  `${TRIPID}${BOOKINGID}/verify-otp`,
+  authenticate,
+  authorize([DRIVER_ROLE]),
+  tripController.verifyOtp
 );
 
 export default router;

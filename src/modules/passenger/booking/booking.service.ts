@@ -4,7 +4,6 @@ import {
   BOOKINGS_NOT_FOUND,
   TRIP_NOT_FOUND,
 } from "../../../constants/messages.js";
-import type { BookTripInput } from "../trip/trip.validator.js";
 import PassengerBookingValidator from "./booking.validator.js";
 
 class PassengerBookingService {

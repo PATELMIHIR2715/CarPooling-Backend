@@ -198,6 +198,7 @@ enum BookingStatus {
     REJECTED
     CANCELLED
     COMPLETED
+    PICKEDUP
 }
 
 enum RideStatus {

@@ -12,6 +12,11 @@ const envSchema = z.object({
   GEOAPIFY_API_KEY: z.string(),
   UPSTASH_REDIS_URL: z.string(),
   UPSTASH_REDIS_TOKEN: z.string(),
+  SMTP_HOST: z.string(),
+  SMTP_PORT: z.string(),
+  SMTP_USER: z.string(),
+  SMTP_PASS: z.string(),
+  SMTP_FROM: z.string(),
 });
 const env = envSchema.parse(process.env);
 export default env;
