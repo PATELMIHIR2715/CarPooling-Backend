@@ -75,7 +75,7 @@ class TripService {
       }),
     ]);
     return {
-      data: trips.filter((trip) => {
+      data: trips.filter((trip: any) => {
         const pickupPoints = toPickupPoints(trip.pickupLocations);
         const destinationPoint = getDestinationPoint(trip);
 
