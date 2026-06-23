@@ -34,6 +34,11 @@ export const TRIPS = "/trips";
 export const MESSAGES = "/messages";
 export const CHAT = "/chat";
 export const GET_MY_CHATS = "/get-my-chats";
+export const PAYMENT = "/payment";
+export const VERIFY = "/verify";
+export const CREATE_ORDER = "/create-order";
+export const WEBHOOK = "/webhook";
+export const REFUND = "/refund";
 
 // Dynamic Routes
 

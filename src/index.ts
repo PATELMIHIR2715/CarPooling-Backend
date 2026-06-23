@@ -37,6 +37,7 @@ import {
   RATING,
   ADMIN,
   CHAT,
+  PAYMENT,
 } from "./constants/routes.js";
 import {
   CORS_PREFLIGHT_PATH,
@@ -52,6 +53,8 @@ import {
   SERVER_RUNNING,
   TOO_MANY_REQUESTS,
 } from "./constants/messages.js";
+import paymentRoutes from "./modules/payment/payment.routes.js";
+
 // test connection
 
 const app = express();
@@ -92,6 +95,8 @@ app.use(`${API}${ADMIN}`, dashboardRoutes);
 app.use(`${API}${ADMIN}`, documentRoutes);
 app.use(`${API}${ADMIN}`, tripRotes);
 app.use(`${API}${CHAT}`, chatRoutes);
+app.use(`${API}${PAYMENT}`, paymentRoutes);
+
 app.get(HEALTH_ROUTE, (_, res) => {
   successResponse(res, null, SERVER_RUNNING, 200);
 });

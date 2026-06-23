@@ -101,7 +101,26 @@ export const EMAIL_SUBJECT_BOOKING_CONFIRMED = "Booking Confirmed!";
 export const EMAIL_SUBJECT_BOOKING_REJECTED = "Booking Rejected";
 export const DATABASE_CONNECTED = "Database connected successfully!";
 export const DATABASE_CONNECTION_FAILED = "Database connection failed:";
+export const WEBHOOK_ERROR = "Webhook error:";
 
 // Rating messages
 export const RATING_ALREADY_SUBMITTED =
   "Rating already submitted for this trip";
+export const PAYMENT_ALREADY_MADE = "Payment already made";
+export const COD_PAYMENT_MODE = "Payment mode is cash on delivery";
+export const INVALID_SIGNATURE = "Invalid signature";
+export const INVALID_WEBHOOK_SIGNATURE = "Invalid webhook signature";
+export const PAYMENT_VERIFIED_SUCCESSFULLY =
+  "Payment verified successfully";
+export const COD_REFUND_NOT_ALLOWED = "COD booking cannot be refunded online";
+export const PAYMENT_NOT_MADE = "Payment not made";
+export const PAYMENT_ID_NOT_FOUND = "Payment ID not found";
+export const REFUND_INITIATED = "Refund initiated";
+export const REFUND_TIMELINE = "5-7 business days";
+export const BOOKING_CANCELLED_REASON = "Booking cancelled";
+export const UNHANDLED_WEBHOOK_EVENT = "Unhandled webhook event";
+export const DISPUTE_CREATED = "Dispute created for payment";
+export const DISPUTE_WON = "Dispute won";
+export const DISPUTE_ACTION_REQUIRED = "Dispute action required";
+export const PAYMENT_DOWNTIME_STARTED = "Payment downtime started";
+export const PAYMENT_DOWNTIME_RESOLVED = "Payment downtime resolved";

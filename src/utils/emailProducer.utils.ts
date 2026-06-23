@@ -72,4 +72,22 @@ export const emailProducer = {
   sendTripReminderEmail: async (to: string, name: string) => {
     emailQueue.add(EMAIL_JOBS.TRIP_REMINDER, { to, name });
   },
+
+  sendBookingPaymentEmail: async (
+    to: string,
+    passengerName: string,
+    driverName: string,
+    origin: string,
+    destination: string,
+    departureTime: string
+  ) => {
+    emailQueue.add(EMAIL_JOBS.BOOKING_AMOUNT_RECEIVED, {
+      to,
+      passengerName,
+      driverName,
+      origin,
+      destination,
+      departureTime,
+    });
+  },
 };

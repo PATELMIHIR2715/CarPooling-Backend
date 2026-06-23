@@ -66,9 +66,13 @@ model Booking {
     updatedAt       DateTime      @updatedAt
     dropoffLocation String
     pickupLocation  String
+    paymentMode     PaymentMode   @default(COD)
+    paymentStatus   PaymentStatus @default(PENDING)
+    orderId         String?
 
-    ride      Ride @relation(fields: [tripId], references: [id])
-    passenger User @relation(fields: [passengerId], references: [id])
+    payment   Payment? @relation(name: "PaymentToBooking")
+    ride      Ride     @relation(fields: [tripId], references: [id])
+    passenger User     @relation(fields: [passengerId], references: [id])
 
     @@map("tbl_booking")
 }
@@ -186,6 +190,51 @@ model Message {
     @@map("tbl_message")
 }
 
+model Payment {
+    id                String        @id @default(uuid())
+    bookingId         String        @unique
+    amount            Float
+    currency          String        @default("INR")
+    razorpayOrderId   String        @unique
+    razorpayPaymentId String?       @unique
+    razorpaySignature String?
+    status            PaymentStatus @default(PENDING)
+    mode              PaymentMode
+    refundId          String?
+    refundStatus      RefundStatus?
+    createdAt         DateTime      @default(now())
+    updatedAt         DateTime      @updatedAt
+
+    booking  Booking   @relation(name: "PaymentToBooking", fields: [bookingId], references: [id])
+    disputes Dispute[]
+
+    @@map("tbl_payment")
+}
+
+model Dispute {
+    id                String        @id @default(uuid())
+    paymentId         String
+    razorpayDisputeId String        @unique
+    amount            Float
+    status            DisputeStatus @default(OPEN)
+    reason            String?
+    createdAt         DateTime      @default(now())
+    updatedAt         DateTime      @updatedAt
+
+    payment Payment @relation(fields: [paymentId], references: [id])
+
+    @@map("tbl_dispute")
+}
+
+enum DisputeStatus {
+    OPEN
+    UNDER_REVIEW
+    ACTION_REQUIRED
+    WON
+    LOST
+    CLOSED
+}
+
 enum Role {
     DRIVER
     PASSENGER
@@ -219,4 +268,23 @@ enum DocumentStatus {
     PENDING
     APPROVED
     REJECTED
+}
+
+enum PaymentMode {
+    COD
+    ADVANCE
+}
+
+enum PaymentStatus {
+    PENDING
+    PAID
+    FAILED
+    REFUNDED
+    PARTIALLY_REFUNDED
+}
+
+enum RefundStatus {
+    PENDING
+    PROCESSED
+    FAILED
 }

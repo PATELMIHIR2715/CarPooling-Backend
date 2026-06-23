@@ -102,6 +102,19 @@ export const startEmailWorker = () => {
             )
           );
           break;
+        case EMAIL_JOBS.BOOKING_AMOUNT_RECEIVED:
+          await sendEmail(
+            data.to,
+            EMAIL_SUBJECT_BOOKING_CONFIRMED,
+            bookingAcceptedTemplate(
+              data.passengerName,
+              data.driverName,
+              data.origin,
+              data.destination,
+              data.departureTime
+            )
+          );
+          break;
       }
       console.log(`${EMAIL_JOB_COMPLETED_FOR} ${job.name}: ${data.to}`);
     },
