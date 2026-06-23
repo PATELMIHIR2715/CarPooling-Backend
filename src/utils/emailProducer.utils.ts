@@ -4,6 +4,9 @@ export const emailProducer = {
   sendWelcomeEmail: async (to: string, name: string, role: string) => {
     emailQueue.add(EMAIL_JOBS.WELCOME, { to, name, role });
   },
+  sendRegistrationOtpEmail: async (to: string, name: string, otp: string) => {
+    emailQueue.add(EMAIL_JOBS.REGISTRATION_OTP, { to, name, otp });
+  },
   sendOtpEmail: async (to: string, name: string, otp: string) => {
     emailQueue.add(EMAIL_JOBS.OTP, { to, name, otp });
   },
@@ -71,5 +74,23 @@ export const emailProducer = {
   },
   sendTripReminderEmail: async (to: string, name: string) => {
     emailQueue.add(EMAIL_JOBS.TRIP_REMINDER, { to, name });
+  },
+
+  sendBookingPaymentEmail: async (
+    to: string,
+    passengerName: string,
+    driverName: string,
+    origin: string,
+    destination: string,
+    departureTime: string
+  ) => {
+    emailQueue.add(EMAIL_JOBS.BOOKING_AMOUNT_RECEIVED, {
+      to,
+      passengerName,
+      driverName,
+      origin,
+      destination,
+      departureTime,
+    });
   },
 };

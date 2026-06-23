@@ -14,7 +14,7 @@ const locationSchema = z.object({
 });
 
 export const createTripShema = z.object({
-  price: z.number().min(1),
+  pricePerKm: z.number().min(1),
   pickupLocations: z.array(locationSchema).min(0).optional(),
   destination: locationSchema,
   endTime: z.string(),

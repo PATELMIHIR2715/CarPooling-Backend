@@ -1,16 +1,20 @@
 # Carpooling Backend
 
-Node.js, Express, TypeScript, Prisma, PostgreSQL, Redis, and Socket.IO backend for a role-based carpooling platform. The API supports passenger trip search and booking, driver trip and document workflows, admin review tools, chat, ratings, waitlists, cron jobs, and email queue processing.
+Node.js, Express, TypeScript, Prisma, PostgreSQL, Redis, Razorpay, and Socket.IO backend for a role-based carpooling platform. The API supports passenger trip search and booking, driver trip and document workflows, admin review tools, chat, ratings, waitlists, cron jobs, OTP-based verification flows, payment processing, and email queue processing.
 
 ## Features
 
 - JWT authentication with refresh tokens
+- Email OTP verification before account registration
 - Role-based access for passengers, drivers, and admins
 - Driver car registration and document upload through Cloudinary
-- Trip creation, search, booking, waitlist, pickup OTP, and trip status flows
+- Trip creation with driver-defined `pricePerKm`
+- Distance-based booking pricing for partial-route passengers
+- Trip search, booking, waitlist, pickup OTP, and trip status flows
 - Admin dashboards, users, documents, and trip management
 - Real-time chat with Socket.IO
 - Ratings and reviews after completed trips
+- Razorpay order creation, verification, refunds, and webhook handling
 - Prisma ORM with PostgreSQL
 - Redis-backed restrictions and queue infrastructure
 - Security middleware: Helmet, rate limiting, CORS allowlist, upload filtering, and JSON body limits
@@ -37,6 +41,7 @@ Node.js, Express, TypeScript, Prisma, PostgreSQL, Redis, and Socket.IO backend f
 - Redis or Upstash Redis
 - Cloudinary account
 - SMTP account for email delivery
+- Razorpay account
 
 ### Installation
 
@@ -69,6 +74,10 @@ SMTP_PORT="587"
 SMTP_USER=""
 SMTP_PASS=""
 SMTP_FROM="Carpooling <no-reply@example.com>"
+
+RAZORPAY_KEY_ID=""
+RAZORPAY_KEY_SECRET=""
+RAZORPAY_WEBHOOK_SECRET=""
 ```
 
 Generate Prisma client and run migrations:
@@ -114,6 +123,7 @@ All application routes are prefixed with `/api`.
 ### Auth
 
 - `POST /api/auth/register`
+- `POST /api/auth/send-registration-otp`
 - `POST /api/auth/login`
 - `POST /api/auth/refresh-token`
 
@@ -123,7 +133,7 @@ All application routes are prefixed with `/api`.
 - `GET /api/car/my-cars`
 - `POST /api/car/documents`
 - `GET /api/car/documents`
-- `POST /api/trip`
+- `POST /api/trip` (`pricePerKm` required)
 - `GET /api/trip`
 - `GET /api/trip/:tripId`
 - `PUT /api/trip/:tripId/start`
@@ -139,6 +149,14 @@ All application routes are prefixed with `/api`.
 - `GET /api/passenger/bookings`
 - `PUT /api/passenger/bookings/:bookingId/cancel`
 - `POST /api/passenger/bookings/:tripId/waitlist`
+
+### Payment
+
+- `POST /api/payment/:bookingId/create-order`
+- `POST /api/payment/:bookingId/verify`
+- `POST /api/payment/:bookingId/refund`
+- `GET /api/payment/:bookingId`
+- `POST /api/payment/webhook`
 
 ### Admin
 
@@ -181,6 +199,13 @@ Errors use:
 ```
 
 Validation errors may also include a `field` path.
+
+## Pricing Model
+
+- Drivers publish rides with `pricePerKm` instead of a fixed full-trip fare.
+- Passenger fare is calculated from the matched pickup point to the matched dropoff point along the ride route.
+- Total fare = `segmentDistanceKm * pricePerKm * seatsBooked`.
+- Waitlist promotions use the same distance-based pricing logic as direct bookings.
 
 ## Security Notes
 

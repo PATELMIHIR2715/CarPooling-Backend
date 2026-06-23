@@ -26,6 +26,7 @@ import dashboardRoutes from "./modules/admin/dashboard/dashboard.routes.js";
 import documentRoutes from "./modules/admin/documents/documents.routes.js";
 import tripRotes from "./modules/admin/trips/trips.routes.js";
 import chatRoutes from "./modules/chat/chat.routes.js";
+import paymentController from "./modules/payment/payment.controller.js";
 import {
   API,
   AUTH,
@@ -37,6 +38,8 @@ import {
   RATING,
   ADMIN,
   CHAT,
+  PAYMENT,
+  WEBHOOK,
 } from "./constants/routes.js";
 import {
   CORS_PREFLIGHT_PATH,
@@ -52,6 +55,8 @@ import {
   SERVER_RUNNING,
   TOO_MANY_REQUESTS,
 } from "./constants/messages.js";
+import paymentRoutes from "./modules/payment/payment.routes.js";
+
 // test connection
 
 const app = express();
@@ -78,6 +83,11 @@ app.use(helmet()); // security headers
 app.use(compression());
 app.options(CORS_PREFLIGHT_PATH, cors(corsOptions));
 app.use(cookieParser());
+app.post(
+  `${API}${PAYMENT}${WEBHOOK}`,
+  express.raw({ type: "application/json" }),
+  paymentController.handleWebhook
+);
 app.use(express.json({ limit: JSON_LIMIT_1MB }));
 app.use(`${API}${AUTH}`, authRoutes);
 app.use(`${API}${CAR}`, carRoutes);
@@ -92,6 +102,8 @@ app.use(`${API}${ADMIN}`, dashboardRoutes);
 app.use(`${API}${ADMIN}`, documentRoutes);
 app.use(`${API}${ADMIN}`, tripRotes);
 app.use(`${API}${CHAT}`, chatRoutes);
+app.use(`${API}${PAYMENT}`, paymentRoutes);
+
 app.get(HEALTH_ROUTE, (_, res) => {
   successResponse(res, null, SERVER_RUNNING, 200);
 });

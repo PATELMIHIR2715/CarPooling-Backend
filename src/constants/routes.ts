@@ -3,6 +3,7 @@
 export const ROOT = "/";
 export const AUTH = "/auth";
 export const REGISTER = "/register";
+export const SEND_REGISTRATION_OTP = "/send-registration-otp";
 export const LOGIN = "/login";
 export const REFRESH_TOKEN = "/refresh-token";
 export const USER = "/user";
@@ -34,6 +35,11 @@ export const TRIPS = "/trips";
 export const MESSAGES = "/messages";
 export const CHAT = "/chat";
 export const GET_MY_CHATS = "/get-my-chats";
+export const PAYMENT = "/payment";
+export const VERIFY = "/verify";
+export const CREATE_ORDER = "/create-order";
+export const WEBHOOK = "/webhook";
+export const REFUND = "/refund";
 
 // Dynamic Routes
 

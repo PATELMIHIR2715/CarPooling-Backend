@@ -10,17 +10,48 @@ import {
   EMAIL_ALREADY_EXISTS,
   INVALID_LOGIN_CREDENTIALS,
   INVALID_REFRESH_TOKEN,
+  REGISTRATION_OTP_INVALID,
+  REGISTRATION_OTP_SENT,
 } from "../../constants/messages.js";
-import type { RegisterInput, LoginInput } from "./auth.validator.js";
+import type {
+  RegisterInput,
+  LoginInput,
+  SendRegistrationOtpInput,
+} from "./auth.validator.js";
 import { emailProducer } from "../../utils/emailProducer.utils.js";
+import {
+  generateRegistrationOtp,
+  storeRegistrationOtp,
+  verifyRegistrationOtp,
+} from "../../utils/registrationOtp.utils.js";
 
 class AuthService {
-  async registerUser(request: RegisterInput) {
-    const { email, password, name, phone, role } = request;
+  async sendRegistrationOtp(request: SendRegistrationOtpInput) {
+    const { email, name } = request;
     const existing = await prisma.user.findUnique({ where: { email } });
 
     if (existing) {
       throw new Error(EMAIL_ALREADY_EXISTS);
+    }
+
+    const otp = generateRegistrationOtp();
+    await storeRegistrationOtp(email, otp);
+    await emailProducer.sendRegistrationOtpEmail(email, name, otp);
+
+    return { message: REGISTRATION_OTP_SENT };
+  }
+
+  async registerUser(request: RegisterInput) {
+    const { email, otp, password, name, phone, role } = request;
+    const existing = await prisma.user.findUnique({ where: { email } });
+
+    if (existing) {
+      throw new Error(EMAIL_ALREADY_EXISTS);
+    }
+
+    const isOtpValid = await verifyRegistrationOtp(email, otp);
+    if (!isOtpValid) {
+      throw new Error(REGISTRATION_OTP_INVALID);
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
