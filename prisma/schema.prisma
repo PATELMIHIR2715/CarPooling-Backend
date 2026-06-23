@@ -60,6 +60,8 @@ model Booking {
     passengerId     String
     passengerName   String?
     price           Float
+    distanceKm      Float
+    unitPricePerKm  Float
     seatBooked      Int
     status          BookingStatus @default(PENDING)
     createdAt       DateTime      @default(now())
@@ -80,7 +82,7 @@ model Booking {
 model Ride {
     id                  String     @id @default(uuid())
     driverId            String
-    price               Float
+    pricePerKm          Float
     tripcode            String     @unique
     status              RideStatus @default(SCHEDULED)
     pickupLocations     Json[]
@@ -112,7 +114,11 @@ model WaitingList {
     rideId          String
     passengerId     String
     pickupLocation  String            @default("")
+    pickupLat       Float?
+    pickupLon       Float?
     dropoffLocation String            @default("")
+    dropoffLat      Float?
+    dropoffLon      Float?
     seatsRequested  Int               @default(1)
     createdAt       DateTime          @default(now())
     updatedAt       DateTime          @updatedAt

@@ -3,6 +3,7 @@
 export const ROOT = "/";
 export const AUTH = "/auth";
 export const REGISTER = "/register";
+export const SEND_REGISTRATION_OTP = "/send-registration-otp";
 export const LOGIN = "/login";
 export const REFRESH_TOKEN = "/refresh-token";
 export const USER = "/user";

@@ -67,7 +67,7 @@ class TripService {
       tripcode: tripCode,
       carId: car.id,
       driverId,
-      price: data.price,
+      pricePerKm: data.pricePerKm,
       pickupLocations: data.pickupLocations ?? [],
       destinationLocation: data.destination.name,
       destinationLat: data.destination.lat,

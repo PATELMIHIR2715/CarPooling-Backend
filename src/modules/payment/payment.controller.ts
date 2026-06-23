@@ -34,11 +34,13 @@ class PaymentController {
         razorpaySignature,
         bookingId,
       } = req.body;
+      const userId = req.user.userId;
       const result = await paymentService.verifyPayment(
         razorpayOrderId,
         razorpayPaymentId,
         razorpaySignature,
-        bookingId
+        bookingId,
+        userId
       );
 
       successResponse(res, result, 200);

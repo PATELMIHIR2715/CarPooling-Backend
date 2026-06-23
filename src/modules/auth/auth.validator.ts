@@ -7,6 +7,7 @@ import {
 import {
   INVALID_EMAIL,
   NAME_TOO_SHORT,
+  OTP_REQUIRED,
   PASSWORD_TOO_SHORT,
   PASSWORD_WEAK,
   PHONE_NUMBER_TOO_SHORT,
@@ -17,6 +18,7 @@ import { PASSWORD_REGEX } from "../../constants/regex.js";
 export const registerSchema = z.object({
   name: z.string().min(2, NAME_TOO_SHORT),
   email: z.string().email(INVALID_EMAIL),
+  otp: z.string().trim().length(6, OTP_REQUIRED),
   password: z
     .string()
     .min(8, PASSWORD_TOO_SHORT)
@@ -27,10 +29,16 @@ export const registerSchema = z.object({
   phone: z.string().min(10, PHONE_NUMBER_TOO_SHORT),
 });
 
+export const sendRegistrationOtpSchema = z.object({
+  email: z.string().email(INVALID_EMAIL),
+  name: z.string().min(2, NAME_TOO_SHORT),
+});
+
 export const loginSchema = z.object({
   email: z.string().email(INVALID_EMAIL),
   password: z.string().min(8, PASSWORD_TOO_SHORT),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
+export type SendRegistrationOtpInput = z.infer<typeof sendRegistrationOtpSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

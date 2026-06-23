@@ -4,6 +4,9 @@ export const emailProducer = {
   sendWelcomeEmail: async (to: string, name: string, role: string) => {
     emailQueue.add(EMAIL_JOBS.WELCOME, { to, name, role });
   },
+  sendRegistrationOtpEmail: async (to: string, name: string, otp: string) => {
+    emailQueue.add(EMAIL_JOBS.REGISTRATION_OTP, { to, name, otp });
+  },
   sendOtpEmail: async (to: string, name: string, otp: string) => {
     emailQueue.add(EMAIL_JOBS.OTP, { to, name, otp });
   },

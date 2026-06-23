@@ -7,6 +7,7 @@ export const PASSWORD_WEAK =
   "Password must contain at least one uppercase letter and one special character";
 export const ROLE_MISMATCH = "Role must be either DRIVER or PASSENGER";
 export const PHONE_NUMBER_TOO_SHORT = "Phone number must be at least 10 digits";
+export const OTP_REQUIRED = "OTP is required";
 export const NO_CARS_FOUND = "No cars found for this driver";
 export const ALL_DOCUMENTS_REQUIRED = "Licence and RC documents are required";
 export const DOCUMENTS_REQUIRED = "Documents are required";
@@ -63,6 +64,8 @@ export const PICKUP_DROPOFF_LOCATION_INVALID =
   "Pickup and dropoff locations cannot be the same";
 export const PICKUP_DROPOFF_LOCATION_SAME =
   "Pickup and dropoff locations cannot be the same";
+export const PICKUP_DROPOFF_ROUTE_SEQUENCE_INVALID =
+  "Dropoff must come after pickup on the trip route";
 export const ROUTE_NOT_FOUND = "Route not found";
 export const SEATS_AVAILABLE = "Seats are available, no need to join waitlist";
 export const ALREADY_IN_WAITLIST = "Already in waitlist for this trip";
@@ -99,6 +102,8 @@ export const EMAIL_SUBJECT_OTP = "Your OTP Code";
 export const EMAIL_SUBJECT_BOOKING_REQUEST = "New Booking Request";
 export const EMAIL_SUBJECT_BOOKING_CONFIRMED = "Booking Confirmed!";
 export const EMAIL_SUBJECT_BOOKING_REJECTED = "Booking Rejected";
+export const EMAIL_SUBJECT_REGISTRATION_OTP = "Verify your email address";
+export const EMAIL_SUBJECT_PAYMENT_RECEIVED = "Payment received successfully";
 export const DATABASE_CONNECTED = "Database connected successfully!";
 export const DATABASE_CONNECTION_FAILED = "Database connection failed:";
 export const WEBHOOK_ERROR = "Webhook error:";
@@ -124,3 +129,7 @@ export const DISPUTE_WON = "Dispute won";
 export const DISPUTE_ACTION_REQUIRED = "Dispute action required";
 export const PAYMENT_DOWNTIME_STARTED = "Payment downtime started";
 export const PAYMENT_DOWNTIME_RESOLVED = "Payment downtime resolved";
+export const REGISTRATION_OTP_SENT = "Registration OTP sent successfully";
+export const REGISTRATION_OTP_VERIFIED =
+  "Registration OTP verified successfully";
+export const REGISTRATION_OTP_INVALID = "Invalid or expired registration OTP";

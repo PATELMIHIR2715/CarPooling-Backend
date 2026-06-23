@@ -10,8 +10,10 @@ import {
 import {
   loginSchema,
   registerSchema,
+  sendRegistrationOtpSchema,
   type LoginInput,
   type RegisterInput,
+  type SendRegistrationOtpInput,
 } from "./auth.validator.js";
 import { INVALID_INPUT } from "../../constants/messages.js";
 import AuthService from "./auth.service.js";
@@ -21,6 +23,19 @@ import {
 } from "../../utils/response.utils.js";
 
 class AuthController {
+  async sendRegistrationOtp(req: Request, res: Response) {
+    try {
+      const data: SendRegistrationOtpInput = sendRegistrationOtpSchema.parse(
+        req.body
+      );
+      const result = await AuthService.sendRegistrationOtp(data);
+
+      successResponse(res, result, 200);
+    } catch (error) {
+      errorResponseStandard(error, res);
+    }
+  }
+
   async register(req: Request, res: Response) {
     try {
       const data: RegisterInput = registerSchema.parse(req.body);
