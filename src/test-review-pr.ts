@@ -1,4 +1,4 @@
-// src/test-review.ts
+// src/test-review-pr.ts
 // Temporary file to test the PR review bot. Delete after testing.
 
 interface RetryConfig {
