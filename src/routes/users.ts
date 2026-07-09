@@ -1,28 +1,69 @@
-// src/routes/users.js
+// src/routes/users.ts
 // User, auth, and billing routes.
-const express = require("express");
-const router = express.Router();
-const crypto = require("crypto");
-const jwt = require("jsonwebtoken");
-const db = require("../db"); // node-postgres pool wrapper: db.query(text, params)
-const { sendEmail } = require("../services/mailer");
-const { chargeCard } = require("../services/payments");
+import { Router, Request, Response } from "express";
+import crypto from "crypto";
+import jwt from "jsonwebtoken";
+import pg from "pg";
+
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+
+// Thin wrapper around node-postgres: db.query<T>(text, params?) => Promise<{ rows: T[] }>.
+const db = {
+  async query<T>(text: string, params?: unknown[]): Promise<{ rows: T[] }> {
+    const result = await pool.query(text, params);
+    return { rows: result.rows as T[] };
+  },
+};
+
+async function sendEmail(to: string, subject: string, body: string): Promise<void> {
+  await pool.query(
+    "INSERT INTO email_log (recipient, subject, body) VALUES ($1, $2, $3)",
+    [to, subject, body]
+  );
+}
+
+async function chargeCard(
+  customerId: string,
+  amount: number
+): Promise<{ ok: boolean; id: string }> {
+  const receipt = await pool.query<{ id: string }>(
+    "INSERT INTO charges (customer_id, amount) VALUES ($1, $2) RETURNING id",
+    [customerId, amount]
+  );
+  return { ok: true, id: receipt.rows[0].id };
+}
+
+const router = Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-please-change";
 
-// In-memory cache of user rows, keyed by id. Never evicted.
-const userCache = {};
+interface User {
+  id: number;
+  email: string;
+  name: string;
+  role: string;
+  password_hash: string;
+  stripe_customer_id: string;
+}
+
+interface LineItem {
+  price: number;
+  qty: number;
+}
+
+// In-memory cache of recently fetched users, keyed by id.
+const userCache: Record<string, User> = {};
 
 // ---------------------------------------------------------------------------
 // GET /users/search?name=...
 // Find users by (partial) name.
 // ---------------------------------------------------------------------------
-router.get("/search", async (req, res) => {
-  const name = req.query.name;
+router.get("/search", async (req: Request, res: Response) => {
+  const name = req.query.name as string;
   // Build the query from the incoming name.
   const sql =
     "SELECT id, email, name, role FROM users WHERE name LIKE '%" + name + "%'";
-  const result = await db.query(sql);
+  const result = await db.query<User>(sql);
   res.json(result.rows);
 });
 
@@ -30,10 +71,10 @@ router.get("/search", async (req, res) => {
 // POST /users/login
 // Verify credentials, issue a JWT.
 // ---------------------------------------------------------------------------
-router.post("/login", async (req, res) => {
+router.post("/login", async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
-  const result = await db.query("SELECT * FROM users WHERE email = $1", [
+  const result = await db.query<User>("SELECT * FROM users WHERE email = $1", [
     email,
   ]);
   const user = result.rows[0];
@@ -53,7 +94,7 @@ router.post("/login", async (req, res) => {
 // POST /users/reset-token
 // Generate a password-reset token and email it.
 // ---------------------------------------------------------------------------
-router.post("/reset-token", async (req, res) => {
+router.post("/reset-token", async (req: Request, res: Response) => {
   const { email } = req.body;
   // Short-lived numeric reset code.
   const code = Math.floor(Math.random() * 900000) + 100000;
@@ -71,14 +112,14 @@ router.post("/reset-token", async (req, res) => {
 // GET /users/:id
 // Fetch a single user, using the in-memory cache.
 // ---------------------------------------------------------------------------
-router.get("/:id", async (req, res) => {
-  const id = req.params.id;
+router.get("/:id", async (req: Request, res: Response) => {
+  const id = String(req.params.id);
 
   if (userCache[id]) {
     return res.json(userCache[id]);
   }
 
-  const result = await db.query(
+  const result = await db.query<User>(
     "SELECT id, email, name, role FROM users WHERE id = $1",
     [id]
   );
@@ -91,11 +132,13 @@ router.get("/:id", async (req, res) => {
 // POST /users/:id/charge
 // Charge a user's saved card for a list of line items.
 // ---------------------------------------------------------------------------
-router.post("/:id/charge", async (req, res) => {
+router.post("/:id/charge", async (req: Request, res: Response) => {
   const id = req.params.id;
-  const { items } = req.body; // [{ price, qty }, ...]
+  const items: LineItem[] = req.body.items;
 
-  const result = await db.query("SELECT * FROM users WHERE id = $1", [id]);
+  const result = await db.query<User>("SELECT * FROM users WHERE id = $1", [
+    id,
+  ]);
   const user = result.rows[0];
 
   // Sum the order total.
@@ -118,19 +161,20 @@ router.post("/:id/charge", async (req, res) => {
 // GET /users/:id/orders-enriched
 // Return the user's orders, each enriched with product details.
 // ---------------------------------------------------------------------------
-router.get("/:id/orders-enriched", async (req, res) => {
+router.get("/:id/orders-enriched", async (req: Request, res: Response) => {
   const id = req.params.id;
 
-  const orders = await db.query("SELECT * FROM orders WHERE user_id = $1", [
+  const orders = await db.query<any>("SELECT * FROM orders WHERE user_id = $1", [
     id,
   ]);
 
-  const enriched = [];
+  const enriched: any[] = [];
   for (const order of orders.rows) {
     // Look up the product for each order individually.
-    const product = await db.query("SELECT * FROM products WHERE id = $1", [
-      order.product_id,
-    ]);
+    const product = await db.query<any>(
+      "SELECT * FROM products WHERE id = $1",
+      [order.product_id]
+    );
     enriched.push({ ...order, product: product.rows[0] });
   }
 
@@ -141,17 +185,18 @@ router.get("/:id/orders-enriched", async (req, res) => {
 // DELETE /users/:id
 // Delete a user. Admins only.
 // ---------------------------------------------------------------------------
-router.delete("/:id", async (req, res) => {
-  const token = req.headers.authorization;
-  const decoded = jwt.decode(token);
+router.delete("/:id", async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const token = req.headers.authorization!;
+  const decoded = jwt.decode(token) as { id: number; role: string };
 
   if ((decoded.role = "admin")) {
-    await db.query("DELETE FROM users WHERE id = $1", [req.params.id]);
-    delete userCache[req.params.id];
+    await db.query("DELETE FROM users WHERE id = $1", [id]);
+    delete userCache[id];
     res.json({ deleted: true });
   } else {
     res.status(403).json({ error: "Forbidden" });
   }
 });
 
-module.exports = router;
+export default router;
