@@ -1,30 +1,39 @@
-name: AI PR Pipeline (Review + Auto-Fix)
+name: AI PR Pipeline (Review + Auto-Fix, Claude Code / Max plan)
 
-# ONE workflow, TWO modes — this REPLACES the separate "PR Agent (DeepSeek)"
-# workflow (delete that file, or keep it with only auto_describe enabled if
-# you still want AI-written PR descriptions / slash commands).
+# Same two-mode, four-agent pipeline as v3, but ALL agents run on
+# Claude Code authenticated with a Pro/Max subscription OAuth token —
+# no DeepSeek, no Aider, no pay-per-token API billing.
 #
-# REVIEW MODE (automatic - replaces pr-agent auto_review/auto_improve)
-#   Trigger: PR opened / reopened / ready_for_review (bots excluded).
-#   Agent 1 reviews, Agent 2 validates, and the VALIDATED findings are
-#   posted as a comment on the original PR, with a hint to add the
-#   "auto-fix" label. Fast: no npm install, no Aider, read-only.
+# ONE-TIME SETUP
+#   1. Locally run:  claude setup-token
+#   2. Save the printed token as repo secret:  CLAUDE_CODE_OAUTH_TOKEN
+#   3. Do NOT define ANTHROPIC_API_KEY anywhere in this repo's secrets or
+#      env — it takes precedence over the OAuth token and would switch
+#      billing to an API account instead of your subscription.
+#   4. Create the "auto-fix" label.
 #
-# FIX MODE (on demand)
-#   Trigger: label "auto-fix" added to the PR.
-#   Full multi-agent loop:
-#     AGENT 1 REVIEWER  -> AGENT 2 VALIDATOR (discards invalid issues)
-#     -> AGENT 3 FIXER (Aider) -> AGENT 4 VERIFIER (confirms fixes,
-#     re-reviews for new issues; anything open goes back to AGENT 2).
-#   Result: a sub-PR (autofix/pr-<N> -> feature branch) whose DESCRIPTION
-#   lists every issue FIXED (incl. optimizations) and anything STILL OPEN,
-#   plus a per-cycle audit comment.
+# NOTES
+#   - Usage draws from YOUR Max plan quota (shared with your own Claude /
+#     Claude Code sessions). Fine for personal repos and low PR volume;
+#     for org-wide scale Anthropic recommends API keys or Team seats,
+#     since Max subscriptions are intended for a single user.
+#   - The OAuth token can be invalidated if you log out of Claude Code;
+#     regenerate with `claude setup-token` and update the secret.
 #
-# NOTE: sub-PRs opened by this workflow use GITHUB_TOKEN, which does not
-# trigger new workflow runs — and bot senders are excluded anyway — so
-# review mode never runs on its own sub-PRs.
+# AGENTS (per cycle, capped at MAX_ITERS)
+#   AGENT 1 REVIEWER   claude -p, read-only, strict JSON issue list
+#   AGENT 2 VALIDATOR  claude -p, read-only, discards invalid issues
+#   AGENT 3 FIXER      claude -p agentic with Edit/Write tools (auto-commit
+#                      added, since Claude Code does not commit like Aider)
+#   AGENT 4 VERIFIER   claude -p, read-only, confirms fixes + re-reviews;
+#                      open items loop back to AGENT 2
 #
-# TO RE-RUN fix mode on the same PR: remove the "auto-fix" label, re-add it.
+# Kept from v3: tsc baseline (pre-existing errors outside the PR's files
+# excluded from the gate), prisma generate, discarded-issue memory,
+# anti-suppression rules, scope guard covering uncommitted changes,
+# fixed/open tables in the sub-PR description, per-cycle audit comment.
+#
+# TO RE-RUN fix mode: remove the "auto-fix" label, add it again.
 
 on:
   pull_request:
@@ -44,16 +53,14 @@ jobs:
       ${{ (github.event.action == 'labeled' && github.event.label.name == 'auto-fix') ||
           (github.event.action != 'labeled' && github.event.sender.type != 'Bot') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30 # HARD CAP #1: kills a stuck run
+    timeout-minutes: 30 # HARD CAP #1
 
     env:
       MODE: ${{ github.event.action == 'labeled' && 'fix' || 'review' }}
-      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MAX_ITERS: "3" # HARD CAP #2: max validate->fix->verify cycles
-      MODEL: "deepseek/deepseek-v4-flash" # Aider (litellm) id - AGENT 3
-      API_MODEL: "deepseek-v4-flash" # raw model id for direct API - AGENTS 1/2/4
-      DEEPSEEK_API_URL: "https://api.deepseek.com/chat/completions"
+      MAX_ITERS: "3" # HARD CAP #2
+      CLAUDE_MODEL: "sonnet" # alias; use "opus" for harder repos (burns quota faster)
       TEAM_LEAD: "PATELMIHIR2715" # <-- CHANGE
 
     steps:
@@ -64,23 +71,21 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # ---- fix mode only: toolchain for building + editing code ----
+      # Node + Claude Code CLI are needed in BOTH modes
       - name: Setup Node
-        if: ${{ env.MODE == 'fix' }}
         uses: actions/setup-node@v4
         with:
           node-version: "20" # <-- CHANGE if needed
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      # ---- fix mode only: project toolchain ----
       - name: Install dependencies
         if: ${{ env.MODE == 'fix' }}
         run: npm ci # <-- CHANGE to pnpm/yarn if needed
-      - name: Setup Python + Aider
+      - name: Generate Prisma client (needed for tsc if repo uses Prisma)
         if: ${{ env.MODE == 'fix' }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install Aider
-        if: ${{ env.MODE == 'fix' }}
-        run: python -m pip install aider-chat
+        run: npx prisma generate || echo "No Prisma schema - skipping"
 
       - name: Create fix branch
         if: ${{ env.MODE == 'fix' }}
@@ -107,9 +112,10 @@ jobs:
           fi
           echo "Mode: $MODE"; echo "Files in scope:"; echo "$CHANGED"
           mkdir -p /tmp/agents
+          printf '%s\n' $CHANGED > /tmp/agents/changed.txt
 
           # ---------------- helpers ----------------
-          bundle() { # snapshot the CURRENT contents of the changed files
+          bundle() {
             : > /tmp/agents/code.txt
             for f in $CHANGED; do
               { echo "===== FILE: $f ====="; cat "$f"; echo; } >> /tmp/agents/code.txt
@@ -118,16 +124,12 @@ jobs:
             mv /tmp/agents/code.tmp /tmp/agents/code.txt
           }
 
-          call_agent() { # $1=system-prompt-file $2=user-prompt-file $3=output-file
-            jq -n --rawfile sys "$1" --rawfile usr "$2" \
-              '{model:$ENV.API_MODEL, temperature:0,
-                messages:[{role:"system",content:$sys},{role:"user",content:$usr}]}' \
-              > /tmp/agents/req.json
-            curl -sS --max-time 300 "$DEEPSEEK_API_URL" \
-              -H "Content-Type: application/json" \
-              -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
-              -d @/tmp/agents/req.json \
-              | jq -r '.choices[0].message.content // ""' > "$3" || true
+          # Read-only agent call on the Max-plan OAuth token: instructions +
+          # data are piped in, Claude replies with plain text (expected: JSON).
+          call_agent() { # $1=instructions-file $2=data-file $3=output-file
+            cat "$1" "$2" | claude -p "Follow the instructions above exactly. Respond with ONLY the required JSON - no prose, no markdown fences." \
+              --model "$CLAUDE_MODEL" --max-turns 1 --output-format text \
+              > "$3" 2>/dev/null || true
           }
 
           clean_json() { # $1=raw $2=out $3=fallback
@@ -135,9 +137,11 @@ jobs:
             jq -e . "$2" >/dev/null 2>&1 || printf '%s' "$3" > "$2"
           }
 
-          checks() { # tsc/eslint print errors to STDOUT -> capture both streams
-            TSC_OK=0
-            npx tsc --noEmit > /tmp/agents/tsc.log 2>&1 && TSC_OK=1 || true
+          checks() { # tsc with baseline; pre-existing errors outside PR files excluded
+            npx tsc --noEmit > /tmp/agents/tsc.raw 2>&1 || true
+            grep -E 'error TS' /tmp/agents/tsc.raw | sort -u > /tmp/agents/tsc.sorted || true
+            comm -13 /tmp/agents/tsc.baseline /tmp/agents/tsc.sorted > /tmp/agents/tsc.log || true
+            TSC_OK=1; [ -s /tmp/agents/tsc.log ] && TSC_OK=0
             LINT_OK=1
             if ls eslint.config.* .eslintrc* >/dev/null 2>&1; then
               LINT_OK=0
@@ -147,7 +151,7 @@ jobs:
             fi
           }
 
-          validate() { # /tmp/agents/issues.json -> /tmp/agents/valid.json (AGENT 2)
+          validate() {
             if [ "$(jq '[.issues[]?] | length' /tmp/agents/issues.json)" = "0" ]; then
               echo '{"valid_issues":[],"discarded":[]}' > /tmp/agents/valid.json
               return
@@ -158,7 +162,7 @@ jobs:
             clean_json /tmp/agents/raw.txt /tmp/agents/valid.json '{"valid_issues":[],"discarded":[]}'
           }
 
-          md_table() { # $1 = file containing a plain JSON ARRAY of issues
+          md_table() {
             echo "| Severity | Category | File | Problem | Fix |"
             echo "|---|---|---|---|---|"
             jq -r '.[] | "| \(.severity) | \(.category) | \(.file | gsub("\\|";"/")) | \(.problem | gsub("\\|";"/")) | \(.suggested_fix // "-" | gsub("\\|";"/")) |"' "$1"
@@ -168,24 +172,25 @@ jobs:
           cat > /tmp/agents/reviewer.sys <<'EOF'
           You are AGENT 1 - REVIEWER: a strict senior application-security engineer. The code is largely AI-generated, so hunt hard for:
           SECURITY: hardcoded secrets/API keys/passwords; logging of secrets, OTPs, tokens or PII; SQL/command injection; path traversal; SSRF; insecure randomness for tokens/OTPs; missing input validation; unsafe eval/exec.
-          BUGS: missing await on async calls; unhandled promise rejections; null/undefined access; loose equality (==); infinite loops and off-by-one errors; division by zero and unhandled edge cases; 'any' types including 'as any' casts.
+          BUGS: missing await on async calls; unhandled promise rejections; null/undefined access; loose equality (==); infinite loops and off-by-one errors; division by zero and unhandled edge cases; 'any' types including 'as any' casts; error suppression comments (@ts-ignore, @ts-expect-error, ts-nocheck, eslint-disable) hiding real problems.
           OPTIMIZATIONS: repeated/unnecessary work, avoidable O(n^2) patterns, blocking synchronous calls on hot paths. Only flag optimizations with a real, measurable benefit.
-          Respond with ONLY this JSON - no prose, no markdown fences:
+          Required output:
           {"issues":[{"id":1,"file":"path","category":"security|bug|optimization","severity":"critical|high|medium|low","problem":"...","suggested_fix":"..."}]}
           Use {"issues":[]} if the code is clean.
           EOF
 
           cat > /tmp/agents/validator.sys <<'EOF'
           You are AGENT 2 - VALIDATOR. You receive source code and a list of raised issues. Independently verify EVERY issue against the actual code. Discard: false positives, duplicates, pure style nitpicks, and optimizations with no real benefit or that risk changing behaviour. Keep everything genuine - never discard a real security issue.
-          Respond with ONLY this JSON - no prose, no markdown fences:
+          Required output:
           {"valid_issues":[<the input issue objects that are genuine>],"discarded":[{"id":1,"reason":"..."}]}
           EOF
 
           cat > /tmp/agents/verifier.sys <<'EOF'
-          You are AGENT 4 - VERIFIER. You receive the FIXED source code and the list of issues that were supposed to be fixed.
-          1) For each listed issue, check the code and decide if it is genuinely resolved.
-          2) Re-review the code from scratch to the same security/bug/optimization standard, including problems introduced by the fixes themselves.
-          Respond with ONLY this JSON - no prose, no markdown fences:
+          You are AGENT 4 - VERIFIER. You receive the FIXED source code, the list of issues that were supposed to be fixed, and a list of issues previously DISCARDED as invalid.
+          1) For each issue that was supposed to be fixed, check the code and decide if it is genuinely resolved.
+          2) Re-review the code from scratch to the same security/bug/optimization standard, including problems introduced by the fixes themselves. Flag any error-suppression comments (@ts-ignore, @ts-expect-error, ts-nocheck, eslint-disable) added by the fixes.
+          3) Do NOT re-raise any issue (or an equivalent of it) that appears in the PREVIOUSLY DISCARDED list.
+          Required output:
           {"unresolved":[<issue objects still present>],"new_issues":[{"id":101,"file":"...","category":"security|bug|optimization","severity":"critical|high|medium|low","problem":"...","suggested_fix":"..."}]}
           Use empty arrays when everything is resolved and nothing new was found.
           EOF
@@ -195,21 +200,21 @@ jobs:
           { echo "Review these changed files:"; echo; cat /tmp/agents/code.txt; } > /tmp/agents/usr.txt
           call_agent /tmp/agents/reviewer.sys /tmp/agents/usr.txt /tmp/agents/raw.txt
           if [ ! -s /tmp/agents/raw.txt ]; then
-            echo "Reviewer agent returned nothing (API failure?) - failing instead of pretending the code is clean."
+            echo "Reviewer returned nothing. Check CLAUDE_CODE_OAUTH_TOKEN (regenerate with 'claude setup-token' if you logged out) and plan usage limits."
             exit 1
           fi
           clean_json /tmp/agents/raw.txt /tmp/agents/issues.json '{"issues":[]}'
           N_ISSUES=$(jq '[.issues[]?] | length' /tmp/agents/issues.json)
           echo "AGENT 1 (Reviewer) raised $N_ISSUES issue(s)."
 
-          # ================ REVIEW MODE: validate, comment, stop ================
+          # ================ REVIEW MODE ================
           if [ "$MODE" = "review" ]; then
             validate
             jq '[.valid_issues[]?]' /tmp/agents/valid.json > /tmp/agents/show.json
             N_VALID=$(jq 'length' /tmp/agents/show.json)
             N_DISC=$(jq '[.discarded[]?] | length' /tmp/agents/valid.json)
             {
-              echo "## 🤖 AI review — $N_VALID validated issue(s) ($N_DISC raised-then-discarded as invalid)"
+              echo "## 🤖 AI review (Claude) — $N_VALID validated issue(s) ($N_DISC raised-then-discarded as invalid)"
               echo
               if [ "$N_VALID" = "0" ]; then
                 echo "No valid security issues, bugs, or worthwhile optimizations found in the changed JS/TS files. ✅"
@@ -224,11 +229,21 @@ jobs:
             exit 0
           fi
 
-          # ================ FIX MODE: full multi-agent loop ================
+          # ================ FIX MODE ================
+          npx tsc --noEmit > /tmp/agents/tsc.base 2>&1 || true
+          grep -E 'error TS' /tmp/agents/tsc.base | grep -vFf /tmp/agents/changed.txt | sort -u > /tmp/agents/tsc.baseline || true
+          if [ -s /tmp/agents/tsc.baseline ]; then
+            echo "NOTE: $(wc -l < /tmp/agents/tsc.baseline) pre-existing tsc error(s) outside the PR's files - excluded from the gate."
+          fi
+
           AUDIT=/tmp/agents/audit.md
-          echo "## AI multi-agent audit for PR #$PR_NUM" > "$AUDIT"
-          { echo; echo "**Agent 1 (Reviewer)** raised **$N_ISSUES** issue(s)."; } >> "$AUDIT"
+          echo "## AI multi-agent audit for PR #$PR_NUM (Claude Code)" > "$AUDIT"
+          { echo; echo "**Agent 1 (Reviewer)** raised **$N_ISSUES** issue(s)."
+            if [ -s /tmp/agents/tsc.baseline ]; then
+              echo; echo "_Note: $(wc -l < /tmp/agents/tsc.baseline) pre-existing tsc error(s) outside this PR's files were excluded from the pass/fail gate._"
+            fi; } >> "$AUDIT"
           echo '[]' > /tmp/agents/fixed.json
+          echo '[]' > /tmp/agents/discarded_all.json
           STATUS="needs-human-review"
 
           for i in $(seq 1 "$MAX_ITERS"); do
@@ -243,30 +258,47 @@ jobs:
             { echo "- Agent 2 (Validator): **$N_VALID valid**, **$N_DISC discarded**"
               jq -r '.discarded[]? | "  - discarded #\(.id): \(.reason)"' /tmp/agents/valid.json; } >> "$AUDIT"
 
+            jq -s '[.[1].discarded[]? as $d | (.[0].issues[]? | select(.id == $d.id) | {id, file, problem, reason: $d.reason})]' \
+              /tmp/agents/issues.json /tmp/agents/valid.json > /tmp/agents/cycle_disc.json
+            jq -s '.[0] + .[1]' /tmp/agents/discarded_all.json /tmp/agents/cycle_disc.json > /tmp/agents/disc.tmp
+            mv /tmp/agents/disc.tmp /tmp/agents/discarded_all.json
+
             checks
             if [ "$N_VALID" = "0" ] && [ "$TSC_OK" = "1" ] && [ "$LINT_OK" = "1" ]; then
-              STATUS="clean"
-              echo "No valid issues left and tsc/eslint are green. Done."
-              break
+              STATUS="clean"; echo "No valid issues left; no NEW tsc/eslint errors. Done."; break
             fi
 
-            # -------- PHASE 3: FIXER (Aider) --------
+            # -------- PHASE 3: FIXER (Claude Code, agentic) --------
             {
-              echo "Fix ALL of the following validated issues. Keep changes minimal and behaviour-preserving. Do NOT create new files (no config files), do NOT rename files."
+              echo "Fix ALL of the following validated issues in this repository. Keep changes minimal and behaviour-preserving."
+              echo "HARD RULES: you may ONLY modify these files (no other file, no new files, no renames, no config files):"
+              printf '  %s\n' $CHANGED
+              echo "NEVER suppress errors with @ts-ignore, @ts-expect-error, ts-nocheck, or eslint-disable. If an error comes from the repository environment (e.g. missing generated code) rather than these files, leave it alone."
+              echo
+              echo "ISSUES TO FIX:"
               jq -r '.valid_issues[]? | "- [\(.severity)/\(.category)] \(.file): \(.problem) -> \(.suggested_fix)"' /tmp/agents/valid.json
-              echo; echo "--- TypeScript errors ---"; tail -c 4000 /tmp/agents/tsc.log
+              echo; echo "--- NEW TypeScript errors (pre-existing repo errors already excluded) ---"; tail -c 4000 /tmp/agents/tsc.log
               echo; echo "--- ESLint errors ---"; tail -c 4000 /tmp/agents/eslint.log
             } > /tmp/agents/fix-prompt.txt
-            aider --model "$MODEL" --yes-always --no-check-update \
-              --message-file /tmp/agents/fix-prompt.txt \
-              $CHANGED
+            claude -p "$(cat /tmp/agents/fix-prompt.txt)" \
+              --model "$CLAUDE_MODEL" \
+              --permission-mode acceptEdits \
+              --allowedTools "Read,Edit,Write,Grep,Glob" \
+              --max-turns 20 \
+              > /tmp/agents/fixer.log 2>&1 || true
+            tail -20 /tmp/agents/fixer.log
+            # Claude Code does not auto-commit (Aider did) - commit explicitly
+            git add -A
+            git commit -m "fix(autofix): cycle $i automated fixes" || echo "Cycle $i: no changes to commit."
 
             # -------- PHASE 4: VERIFIER --------
             bundle
             checks
             { echo "FIXED CODE:"; cat /tmp/agents/code.txt; echo
               echo "ISSUES THAT WERE SUPPOSED TO BE FIXED:"
-              jq '{issues:[.valid_issues[]?]}' /tmp/agents/valid.json; } > /tmp/agents/usr.txt
+              jq '{issues:[.valid_issues[]?]}' /tmp/agents/valid.json; echo
+              echo "PREVIOUSLY DISCARDED AS INVALID (do NOT re-raise these or equivalents):"
+              cat /tmp/agents/discarded_all.json; } > /tmp/agents/usr.txt
             call_agent /tmp/agents/verifier.sys /tmp/agents/usr.txt /tmp/agents/raw.txt
             clean_json /tmp/agents/raw.txt /tmp/agents/verify.json '{"unresolved":[],"new_issues":[]}'
             N_UNRES=$(jq '[.unresolved[]?] | length' /tmp/agents/verify.json)
@@ -274,7 +306,6 @@ jobs:
             echo "AGENT 4 (Verifier): $N_UNRES unresolved, $N_NEW new."
             echo "- Agent 4 (Verifier): **$N_UNRES unresolved**, **$N_NEW new**, tsc=$TSC_OK lint=$LINT_OK" >> "$AUDIT"
 
-            # Track which validated issues are now genuinely FIXED (valid minus unresolved)
             UNRES_IDS=$(jq -c '[.unresolved[]?.id]' /tmp/agents/verify.json)
             jq --argjson un "$UNRES_IDS" \
               '[.valid_issues[]? | select((.id | IN($un[])) | not)]' \
@@ -283,22 +314,19 @@ jobs:
             mv /tmp/agents/fixed.tmp /tmp/agents/fixed.json
 
             if [ "$N_UNRES" = "0" ] && [ "$N_NEW" = "0" ] && [ "$TSC_OK" = "1" ] && [ "$LINT_OK" = "1" ]; then
-              STATUS="clean"
-              echo "All validated issues verified fixed, no new issues, checks green. Done."
-              break
+              STATUS="clean"; echo "All validated issues verified fixed. Done."; break
             fi
 
-            # Unresolved + new issues go back through the VALIDATOR next cycle
             jq '{issues: ([.unresolved[]?] + [.new_issues[]?])}' /tmp/agents/verify.json > /tmp/agents/issues.json
           done
 
-          # -------- build the sub-PR description: what was fixed / still open --------
+          # -------- sub-PR description: fixed / still open --------
           jq '.issues // []' /tmp/agents/issues.json > /tmp/agents/open.json 2>/dev/null || echo '[]' > /tmp/agents/open.json
           [ "$STATUS" = "clean" ] && echo '[]' > /tmp/agents/open.json
           N_FIXED=$(jq 'length' /tmp/agents/fixed.json)
           N_OPEN=$(jq 'length' /tmp/agents/open.json)
           {
-            echo "## 🤖 Multi-agent auto-fix for #$PR_NUM"
+            echo "## 🤖 Multi-agent auto-fix for #$PR_NUM (Claude Code)"
             echo
             echo "Source PR: ${{ github.event.pull_request.html_url }} — pipeline status: **$STATUS**"
             echo
@@ -316,22 +344,31 @@ jobs:
           {
             echo
             if [ "$STATUS" = "clean" ]; then
-              echo "**FINAL STATUS: CLEAN** - every validated issue fixed and verified; tsc + eslint green."
+              echo "**FINAL STATUS: CLEAN** - every validated issue fixed and verified; no new tsc/eslint errors."
             else
               echo "**FINAL STATUS: NEEDS HUMAN REVIEW** - MAX_ITERS reached with issues still open (see PR description)."
             fi
           } >> "$AUDIT"
           echo "AUTOFIX_STATUS=$STATUS" >> "$GITHUB_ENV"
 
-          # -------- scope guard: revert changes outside the reviewed files --------
-          git diff --name-only "$BASE_SHA" HEAD > /tmp/agents/touched.txt
+          # -------- scope guard: committed AND uncommitted changes --------
+          git add -A
+          { git diff --name-only "$BASE_SHA" HEAD || true
+            git diff --cached --name-only || true
+          } | sort -u > /tmp/agents/touched.txt
           while IFS= read -r f; do
+            [ -z "$f" ] && continue
             printf '%s\n' "$CHANGED" | grep -qxF "$f" && continue
             echo "Reverting out-of-scope change: $f"
-            git checkout "$BASE_SHA" -- "$f" 2>/dev/null || git rm -qf -- "$f"
+            if git cat-file -e "$BASE_SHA:$f" 2>/dev/null; then
+              git checkout "$BASE_SHA" -- "$f"
+            else
+              git rm -qf --ignore-unmatch -- "$f" || rm -f -- "$f"
+            fi
           done < /tmp/agents/touched.txt
-          if [ -n "$(git status --porcelain)" ]; then
-            git commit -am "chore(autofix): revert out-of-scope changes"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(autofix): revert out-of-scope changes"
           fi
 
       - name: Open or update sub-PR with fixed/open issue report
@@ -346,7 +383,7 @@ jobs:
           NUM=$(gh pr list --head "$FIX_BRANCH" --base "$FEATURE_BRANCH" --state open --json number --jq '.[0].number // empty')
           if [ -n "$NUM" ]; then
             gh pr edit "$NUM" --body-file /tmp/agents/summary.md
-            echo "Sub-PR #$NUM updated with new commits and refreshed report."
+            echo "Sub-PR #$NUM updated."
           else
             gh pr create \
               --base "$FEATURE_BRANCH" \
