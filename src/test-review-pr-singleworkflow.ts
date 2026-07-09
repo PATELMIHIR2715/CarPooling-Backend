@@ -26,7 +26,7 @@ export async function notifyUser(to: string, otp: string): Promise<boolean> {
 }
 
 export function shouldRetry(config: RetryConfig, attempt: number) {
-  if (attempt === config.maxRetries) {
+  if (attempt >= config.maxRetries) {
     return false;
   }
   return true;
