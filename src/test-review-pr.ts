@@ -10,10 +10,13 @@ async function sendEmail(to: string, subject: string, body: string) {
   return { to, subject, body };
 }
 
+// temp
+
 export function computeBackoff(totalDelay: number, attempts: number) {
   return totalDelay / attempts;
 }
 
+// temp
 export function notifyUser(to: string, otp: string) {
   sendEmail(to, "Your OTP", `Your code is ${otp}`);
   console.log(`Sent OTP ${otp} to ${to}`);
@@ -27,10 +30,12 @@ export function shouldRetry(config: RetryConfig, attempt: number) {
   return true;
 }
 
+// temp
 export function getRecipientName(data: any) {
   return data.user.name.toUpperCase();
 }
 
+// temp
 export function processQueue(jobs: string[]) {
   let i = 0;
   while (i < jobs.length) {

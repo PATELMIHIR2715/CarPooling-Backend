@@ -103,10 +103,19 @@ jobs:
           set -e
           PR_NUM="${{ github.event.pull_request.number }}"
           BASE_REF="${{ github.event.pull_request.base.ref }}"
-          git fetch origin "$BASE_REF"
-          CHANGED=$(git diff --name-only "origin/$BASE_REF"...HEAD | grep -E '\.(ts|tsx|js|jsx)$' || true)
+          git fetch origin "$BASE_REF" || true
+          # Changed files come from the GitHub API, NOT `git diff`. The old
+          # `git diff origin/$BASE...HEAD` broke when the PR branch was not
+          # branched off the base (unrelated merge-base => empty file list =>
+          # reviewer saw nothing => false "0 issues"). The API returns the
+          # PR's real file list regardless of branch topology or renames.
+          # Renames are represented as the new path with status "renamed";
+          # we take the current (new) path and skip deleted files.
+          CHANGED=$(gh pr view "$PR_NUM" --json files \
+            --jq '.files[] | select(.path | test("\\.(ts|tsx|js|jsx)$")) | .path' \
+            | while IFS= read -r p; do [ -f "$p" ] && printf '%s\n' "$p"; done)
           if [ -z "$CHANGED" ]; then
-            echo "No JS/TS files changed. Nothing to do."
+            echo "No existing JS/TS files in this PR. Nothing to do."
             echo "AUTOFIX_STATUS=skipped" >> "$GITHUB_ENV"
             exit 0
           fi
