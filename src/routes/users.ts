@@ -95,7 +95,7 @@ function authorizeForUser(
 // Find users by (partial) name.
 // ---------------------------------------------------------------------------
 router.get("/search", async (req: Request, res: Response) => {
-  const name = req.query.name as string;
+  const name = typeof req.query.name === "string" ? req.query.name : "";
   // Escape LIKE wildcards in the untrusted input so they aren't interpreted as patterns.
   const escapedName = name.replace(/[\\%_]/g, "\\$&");
   const result = await db.query<User>(
@@ -183,7 +183,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 // Charge a user's saved card for a list of line items.
 // ---------------------------------------------------------------------------
 router.post("/:id/charge", async (req: Request, res: Response) => {
-  const id = req.params.id;
+  const id = String(req.params.id);
   const items: LineItem[] = req.body.items;
 
   if (!authorizeForUser(req, res, id)) {
@@ -194,6 +194,10 @@ router.post("/:id/charge", async (req: Request, res: Response) => {
     id,
   ]);
   const user = result.rows[0];
+
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
 
   // Sum the order total.
   let total = 0;
@@ -219,7 +223,7 @@ router.post("/:id/charge", async (req: Request, res: Response) => {
 // Return the user's orders, each enriched with product details.
 // ---------------------------------------------------------------------------
 router.get("/:id/orders-enriched", async (req: Request, res: Response) => {
-  const id = req.params.id;
+  const id = String(req.params.id);
 
   if (!authorizeForUser(req, res, id)) {
     return;
