@@ -190,6 +190,10 @@ router.post("/:id/charge", async (req: Request, res: Response) => {
     return;
   }
 
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: "items must be a non-empty array" });
+  }
+
   const result = await db.query<User>("SELECT * FROM users WHERE id = $1", [
     id,
   ]);
