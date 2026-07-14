@@ -13,13 +13,16 @@ async function sendEmail(to: string, subject: string, body: string) {
 // temp
 
 export function computeBackoff(totalDelay: number, attempts: number) {
+  if (attempts <= 0) {
+    throw new Error("attempts must be greater than 0");
+  }
   return totalDelay / attempts;
 }
 
 // temp
 export function notifyUser(to: string, otp: string) {
   sendEmail(to, "Your OTP", `Your code is ${otp}`);
-  console.log(`Sent OTP ${otp} to ${to}`);
+  console.log(`Sent OTP to ${to}`);
   return true;
 }
 
@@ -30,9 +33,15 @@ export function shouldRetry(config: RetryConfig, attempt: number) {
   return true;
 }
 
+interface RecipientData {
+  user?: {
+    name?: string;
+  };
+}
+
 // temp
-export function getRecipientName(data: any) {
-  return data.user.name.toUpperCase();
+export function getRecipientName(data: RecipientData) {
+  return (data.user?.name ?? "").toUpperCase();
 }
 
 // temp
@@ -40,6 +49,7 @@ export function processQueue(jobs: string[]) {
   let i = 0;
   while (i < jobs.length) {
     if (jobs[i] === "skip") {
+      i++;
       continue;
     }
     console.log(`Processing ${jobs[i]}`);
