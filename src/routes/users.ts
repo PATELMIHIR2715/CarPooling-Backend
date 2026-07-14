@@ -3,6 +3,7 @@
 import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 import pg from "pg";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -35,6 +36,9 @@ async function chargeCard(
 
 const router = Router();
 
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
+  throw new Error("JWT_SECRET must be set in production");
+}
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-please-change";
 
 interface User {
@@ -54,16 +58,50 @@ interface LineItem {
 // In-memory cache of recently fetched users, keyed by id.
 const userCache: Record<string, User> = {};
 
+// Verify the caller's JWT and, unless they're an admin, require it to match
+// the :id route param. Sends a response and returns null when unauthorized.
+function authorizeForUser(
+  req: Request,
+  res: Response,
+  targetId: string
+): { id: number; role: string } | null {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    res.status(401).json({ error: "Unauthorized" });
+    return null;
+  }
+  const token = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : authHeader;
+
+  let decoded: { id: number; role: string };
+  try {
+    decoded = jwt.verify(token, JWT_SECRET) as { id: number; role: string };
+  } catch {
+    res.status(401).json({ error: "Unauthorized" });
+    return null;
+  }
+
+  if (decoded.role !== "admin" && String(decoded.id) !== targetId) {
+    res.status(403).json({ error: "Forbidden" });
+    return null;
+  }
+
+  return decoded;
+}
+
 // ---------------------------------------------------------------------------
 // GET /users/search?name=...
 // Find users by (partial) name.
 // ---------------------------------------------------------------------------
 router.get("/search", async (req: Request, res: Response) => {
   const name = req.query.name as string;
-  // Build the query from the incoming name.
-  const sql =
-    "SELECT id, email, name, role FROM users WHERE name LIKE '%" + name + "%'";
-  const result = await db.query<User>(sql);
+  // Escape LIKE wildcards in the untrusted input so they aren't interpreted as patterns.
+  const escapedName = name.replace(/[\\%_]/g, "\\$&");
+  const result = await db.query<User>(
+    "SELECT id, email, name, role FROM users WHERE name LIKE $1",
+    [`%${escapedName}%`]
+  );
   res.json(result.rows);
 });
 
@@ -79,11 +117,14 @@ router.post("/login", async (req: Request, res: Response) => {
   ]);
   const user = result.rows[0];
 
-  // Hash the incoming password and compare to the stored hash.
-  const hash = crypto.createHash("md5").update(password).digest("hex");
-  if (user.password_hash == hash) {
+  if (!user) {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  const passwordMatches = await bcrypt.compare(password, user.password_hash);
+  if (passwordMatches) {
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET);
-    console.log(`User ${email} logged in with password ${password}`);
+    console.log(`User ${email} logged in successfully`);
     res.json({ token });
   } else {
     res.status(401).json({ error: "Invalid credentials" });
@@ -97,13 +138,18 @@ router.post("/login", async (req: Request, res: Response) => {
 router.post("/reset-token", async (req: Request, res: Response) => {
   const { email } = req.body;
   // Short-lived numeric reset code.
-  const code = Math.floor(Math.random() * 900000) + 100000;
+  const code = crypto.randomInt(100000, 1000000);
 
   await db.query("UPDATE users SET reset_code = $1 WHERE email = $2", [
     code,
     email,
   ]);
-  sendEmail(email, "Your reset code", `Your code is ${code}`);
+  try {
+    await sendEmail(email, "Your reset code", `Your code is ${code}`);
+  } catch (err) {
+    console.error(`Failed to send reset code email to ${email}`, err);
+    return res.status(500).json({ error: "Failed to send reset email" });
+  }
 
   res.json({ ok: true });
 });
@@ -114,6 +160,10 @@ router.post("/reset-token", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.get("/:id", async (req: Request, res: Response) => {
   const id = String(req.params.id);
+
+  if (!authorizeForUser(req, res, id)) {
+    return;
+  }
 
   if (userCache[id]) {
     return res.json(userCache[id]);
@@ -136,6 +186,10 @@ router.post("/:id/charge", async (req: Request, res: Response) => {
   const id = req.params.id;
   const items: LineItem[] = req.body.items;
 
+  if (!authorizeForUser(req, res, id)) {
+    return;
+  }
+
   const result = await db.query<User>("SELECT * FROM users WHERE id = $1", [
     id,
   ]);
@@ -143,12 +197,15 @@ router.post("/:id/charge", async (req: Request, res: Response) => {
 
   // Sum the order total.
   let total = 0;
-  for (let i = 0; i <= items.length; i++) {
+  for (let i = 0; i < items.length; i++) {
     total += items[i].price * items[i].qty;
   }
 
   // Charge the card and record the payment.
-  chargeCard(user.stripe_customer_id, total);
+  const charge = await chargeCard(user.stripe_customer_id, total);
+  if (!charge.ok) {
+    return res.status(502).json({ error: "Charge failed" });
+  }
   await db.query("INSERT INTO payments (user_id, amount) VALUES ($1, $2)", [
     id,
     total,
@@ -164,19 +221,26 @@ router.post("/:id/charge", async (req: Request, res: Response) => {
 router.get("/:id/orders-enriched", async (req: Request, res: Response) => {
   const id = req.params.id;
 
+  if (!authorizeForUser(req, res, id)) {
+    return;
+  }
+
   const orders = await db.query<any>("SELECT * FROM orders WHERE user_id = $1", [
     id,
   ]);
 
-  const enriched: any[] = [];
-  for (const order of orders.rows) {
-    // Look up the product for each order individually.
-    const product = await db.query<any>(
-      "SELECT * FROM products WHERE id = $1",
-      [order.product_id]
-    );
-    enriched.push({ ...order, product: product.rows[0] });
-  }
+  const productIds = [...new Set(orders.rows.map((order) => order.product_id))];
+  const products = productIds.length
+    ? await db.query<any>("SELECT * FROM products WHERE id = ANY($1)", [
+        productIds,
+      ])
+    : { rows: [] };
+  const productsById = new Map(products.rows.map((product) => [product.id, product]));
+
+  const enriched = orders.rows.map((order) => ({
+    ...order,
+    product: productsById.get(order.product_id),
+  }));
 
   res.json(enriched);
 });
@@ -187,10 +251,22 @@ router.get("/:id/orders-enriched", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.delete("/:id", async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const token = req.headers.authorization!;
-  const decoded = jwt.decode(token) as { id: number; role: string };
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const token = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : authHeader;
 
-  if ((decoded.role = "admin")) {
+  let decoded: { id: number; role: string };
+  try {
+    decoded = jwt.verify(token, JWT_SECRET) as { id: number; role: string };
+  } catch {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (decoded.role === "admin") {
     await db.query("DELETE FROM users WHERE id = $1", [id]);
     delete userCache[id];
     res.json({ deleted: true });
