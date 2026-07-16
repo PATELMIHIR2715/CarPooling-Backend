@@ -28,18 +28,54 @@ import {
   EMAIL_WORKER_STARTED,
 } from "../constants/messages.js";
 
+if (!env.UPSTASH_REDIS_URL) {
+  throw new Error(
+    "Missing required environment variable: UPSTASH_REDIS_URL"
+  );
+}
+
+let upstashRedisHost: string;
+try {
+  upstashRedisHost = new URL(env.UPSTASH_REDIS_URL).hostname;
+} catch {
+  throw new Error(
+    "Invalid environment variable UPSTASH_REDIS_URL: expected a valid URL"
+  );
+}
+
 const connection = {
-  host: new URL(env.UPSTASH_REDIS_URL!).hostname,
+  host: upstashRedisHost,
   port: 6379,
   password: env.UPSTASH_REDIS_TOKEN,
   tls: {},
 };
+
+const maskEmail = (email: unknown): string => {
+  if (typeof email !== "string" || !email.includes("@")) {
+    return "[redacted]";
+  }
+  const [local, domain] = email.split("@");
+  const maskedLocal =
+    local.length <= 2
+      ? `${local[0] ?? ""}*`
+      : `${local[0]}${"*".repeat(local.length - 2)}${local[local.length - 1]}`;
+  return `${maskedLocal}@${domain}`;
+};
+
+const isValidEmailAddress = (value: unknown): value is string =>
+  typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
 export const startEmailWorker = () => {
   const worker = new Worker(
     EMAIL_QUEUE_NAME,
     async (job) => {
       const { data } = job;
+
+      if (!isValidEmailAddress(data.to)) {
+        throw new Error(
+          `Invalid recipient email address for job ${job.name}`
+        );
+      }
 
       switch (job.name) {
         case EMAIL_JOBS.WELCOME:
@@ -127,8 +163,13 @@ export const startEmailWorker = () => {
             )
           );
           break;
+
+        default:
+          throw new Error(`Unrecognized email job type: ${job.name}`);
       }
-      console.log(`${EMAIL_JOB_COMPLETED_FOR} ${job.name}: ${data.to}`);
+      console.log(
+        `${EMAIL_JOB_COMPLETED_FOR} ${job.name}: ${maskEmail(data.to)}`
+      );
     },
     { connection }
   );
