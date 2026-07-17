@@ -3,6 +3,7 @@
 import { Router, Request, Response } from "express";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 import pg from "pg";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -35,7 +36,10 @@ async function chargeCard(
 
 const router = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-please-change";
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable must be set");
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
 interface User {
   id: number;
@@ -51,8 +55,56 @@ interface LineItem {
   qty: number;
 }
 
-// In-memory cache of recently fetched users, keyed by id.
-const userCache: Record<string, User> = {};
+interface AuthPayload {
+  id: number;
+  role: string;
+}
+
+// Verifies the bearer token in the Authorization header, returning the
+// decoded payload or null if missing/invalid.
+function getAuthUser(req: Request): AuthPayload | null {
+  const header = req.headers.authorization;
+  if (!header) return null;
+  const token = header.startsWith("Bearer ") ? header.slice(7) : header;
+  try {
+    return jwt.verify(token, JWT_SECRET) as AuthPayload;
+  } catch {
+    return null;
+  }
+}
+
+const USER_CACHE_MAX_SIZE = 500;
+const USER_CACHE_TTL_MS = 60_000;
+
+// Bounded, TTL-expiring cache of recently fetched users, keyed by id.
+class UserCache {
+  private entries = new Map<string, { user: User; expiresAt: number }>();
+
+  get(id: string): User | undefined {
+    const entry = this.entries.get(id);
+    if (!entry) return undefined;
+    if (entry.expiresAt <= Date.now()) {
+      this.entries.delete(id);
+      return undefined;
+    }
+    return entry.user;
+  }
+
+  set(id: string, user: User): void {
+    this.entries.delete(id);
+    if (this.entries.size >= USER_CACHE_MAX_SIZE) {
+      const oldestKey = this.entries.keys().next().value;
+      if (oldestKey !== undefined) this.entries.delete(oldestKey);
+    }
+    this.entries.set(id, { user, expiresAt: Date.now() + USER_CACHE_TTL_MS });
+  }
+
+  delete(id: string): void {
+    this.entries.delete(id);
+  }
+}
+
+const userCache = new UserCache();
 
 // ---------------------------------------------------------------------------
 // GET /users/search?name=...
@@ -60,10 +112,10 @@ const userCache: Record<string, User> = {};
 // ---------------------------------------------------------------------------
 router.get("/search", async (req: Request, res: Response) => {
   const name = req.query.name as string;
-  // Build the query from the incoming name.
-  const sql =
-    "SELECT id, email, name, role FROM users WHERE name LIKE '%" + name + "%'";
-  const result = await db.query<User>(sql);
+  const result = await db.query<User>(
+    "SELECT id, email, name, role FROM users WHERE name LIKE '%' || $1 || '%'",
+    [name]
+  );
   res.json(result.rows);
 });
 
@@ -79,11 +131,16 @@ router.post("/login", async (req: Request, res: Response) => {
   ]);
   const user = result.rows[0];
 
-  // Hash the incoming password and compare to the stored hash.
-  const hash = crypto.createHash("md5").update(password).digest("hex");
-  if (user.password_hash == hash) {
-    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET);
-    console.log(`User ${email} logged in with password ${password}`);
+  if (!user) {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (valid) {
+    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, {
+      expiresIn: "1h",
+    });
+    console.log(`User ${email} logged in`);
     res.json({ token });
   } else {
     res.status(401).json({ error: "Invalid credentials" });
@@ -97,13 +154,17 @@ router.post("/login", async (req: Request, res: Response) => {
 router.post("/reset-token", async (req: Request, res: Response) => {
   const { email } = req.body;
   // Short-lived numeric reset code.
-  const code = Math.floor(Math.random() * 900000) + 100000;
+  const code = crypto.randomInt(100000, 1000000);
 
   await db.query("UPDATE users SET reset_code = $1 WHERE email = $2", [
     code,
     email,
   ]);
-  sendEmail(email, "Your reset code", `Your code is ${code}`);
+  try {
+    await sendEmail(email, "Your reset code", `Your code is ${code}`);
+  } catch (err) {
+    console.error(`Failed to send reset code email to ${email}`, err);
+  }
 
   res.json({ ok: true });
 });
@@ -115,8 +176,17 @@ router.post("/reset-token", async (req: Request, res: Response) => {
 router.get("/:id", async (req: Request, res: Response) => {
   const id = String(req.params.id);
 
-  if (userCache[id]) {
-    return res.json(userCache[id]);
+  const authUser = getAuthUser(req);
+  if (!authUser) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  if (authUser.role !== "admin" && String(authUser.id) !== id) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const cached = userCache.get(id);
+  if (cached) {
+    return res.json(cached);
   }
 
   const result = await db.query<User>(
@@ -124,7 +194,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     [id]
   );
   const user = result.rows[0];
-  userCache[id] = user;
+  userCache.set(id, user);
   res.json(user);
 });
 
@@ -136,6 +206,14 @@ router.post("/:id/charge", async (req: Request, res: Response) => {
   const id = req.params.id;
   const items: LineItem[] = req.body.items;
 
+  const authUser = getAuthUser(req);
+  if (!authUser) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  if (authUser.role !== "admin" && String(authUser.id) !== id) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
   const result = await db.query<User>("SELECT * FROM users WHERE id = $1", [
     id,
   ]);
@@ -143,12 +221,15 @@ router.post("/:id/charge", async (req: Request, res: Response) => {
 
   // Sum the order total.
   let total = 0;
-  for (let i = 0; i <= items.length; i++) {
+  for (let i = 0; i < items.length; i++) {
     total += items[i].price * items[i].qty;
   }
 
   // Charge the card and record the payment.
-  chargeCard(user.stripe_customer_id, total);
+  const charge = await chargeCard(user.stripe_customer_id, total);
+  if (!charge.ok) {
+    return res.status(502).json({ error: "Charge failed" });
+  }
   await db.query("INSERT INTO payments (user_id, amount) VALUES ($1, $2)", [
     id,
     total,
@@ -168,15 +249,17 @@ router.get("/:id/orders-enriched", async (req: Request, res: Response) => {
     id,
   ]);
 
-  const enriched: any[] = [];
-  for (const order of orders.rows) {
-    // Look up the product for each order individually.
-    const product = await db.query<any>(
-      "SELECT * FROM products WHERE id = $1",
-      [order.product_id]
-    );
-    enriched.push({ ...order, product: product.rows[0] });
-  }
+  const productIds = [...new Set(orders.rows.map((order) => order.product_id))];
+  const products = await db.query<any>(
+    "SELECT * FROM products WHERE id = ANY($1)",
+    [productIds]
+  );
+  const productsById = new Map(products.rows.map((product) => [product.id, product]));
+
+  const enriched = orders.rows.map((order) => ({
+    ...order,
+    product: productsById.get(order.product_id),
+  }));
 
   res.json(enriched);
 });
@@ -187,12 +270,15 @@ router.get("/:id/orders-enriched", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.delete("/:id", async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const token = req.headers.authorization!;
-  const decoded = jwt.decode(token) as { id: number; role: string };
 
-  if ((decoded.role = "admin")) {
+  const decoded = getAuthUser(req);
+  if (!decoded) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (decoded.role === "admin") {
     await db.query("DELETE FROM users WHERE id = $1", [id]);
-    delete userCache[id];
+    userCache.delete(id);
     res.json({ deleted: true });
   } else {
     res.status(403).json({ error: "Forbidden" });
