@@ -111,9 +111,14 @@ const userCache = new UserCache();
 // Find users by (partial) name.
 // ---------------------------------------------------------------------------
 router.get("/search", async (req: Request, res: Response) => {
+  const authUser = getAuthUser(req);
+  if (!authUser) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   const name = req.query.name as string;
   const result = await db.query<User>(
-    "SELECT id, email, name, role FROM users WHERE name LIKE '%' || $1 || '%'",
+    "SELECT id, email, name, role FROM users WHERE name LIKE '%' || $1 || '%' LIMIT 50",
     [name]
   );
   res.json(result.rows);
@@ -244,6 +249,14 @@ router.post("/:id/charge", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.get("/:id/orders-enriched", async (req: Request, res: Response) => {
   const id = req.params.id;
+
+  const authUser = getAuthUser(req);
+  if (!authUser) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  if (authUser.role !== "admin" && String(authUser.id) !== id) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
 
   const orders = await db.query<any>("SELECT * FROM orders WHERE user_id = $1", [
     id,
