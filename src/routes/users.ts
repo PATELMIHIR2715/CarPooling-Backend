@@ -223,6 +223,9 @@ router.post("/:id/charge", async (req: Request, res: Response) => {
     id,
   ]);
   const user = result.rows[0];
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
 
   // Sum the order total.
   let total = 0;
