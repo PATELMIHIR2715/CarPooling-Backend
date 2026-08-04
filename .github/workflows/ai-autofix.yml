@@ -38,6 +38,11 @@ name: AI PR Pipeline (Review + Auto-Fix, Claude Code / Max plan)
 # with inputs: pr_number (required), mode (review|fix), skip_categories,
 # min_severity, skip_ids. Skip rules are enforced deterministically in
 # AGENT 2 (Validator); skipped issues appear in the audit as discarded.
+# TO RE-RUN fix mode: remove the "auto-fix" label, add it again — or use
+# the workflow_dispatch trigger (Actions tab "Run workflow", or the API)
+# with inputs: pr_number (required), mode (review|fix), skip_categories,
+# min_severity, skip_ids. Skip rules are enforced deterministically in
+# AGENT 2 (Validator); skipped issues appear in the audit as discarded.
 
 on:
   pull_request:
@@ -63,8 +68,30 @@ on:
       skip_ids:
         description: "comma list of issue IDs to skip"
         default: ""
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to process"
+        required: true
+      mode:
+        description: "review or fix"
+        type: choice
+        options: [fix, review]
+        default: fix
+      skip_categories:
+        description: "comma list of categories to skip, e.g. optimization,bug"
+        default: ""
+      min_severity:
+        description: "minimum severity to act on"
+        type: choice
+        options: [low, medium, high, critical]
+        default: low
+      skip_ids:
+        description: "comma list of issue IDs to skip"
+        default: ""
 
 concurrency:
+  group: ai-pr-${{ github.event.inputs.pr_number || github.event.pull_request.number }}
   group: ai-pr-${{ github.event.inputs.pr_number || github.event.pull_request.number }}
   cancel-in-progress: true
 
@@ -77,11 +104,19 @@ jobs:
     if: >-
       ${{ github.event_name == 'workflow_dispatch' ||
           (github.event.action == 'labeled' && github.event.label.name == 'auto-fix') ||
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event.action == 'labeled' && github.event.label.name == 'auto-fix') ||
           (github.event.action != 'labeled' && github.event.sender.type != 'Bot') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30 # HARD CAP #1
 
     env:
+      # dispatch runs take mode from the input; label events keep the old rule
+      MODE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode || (github.event.action == 'labeled' && 'fix' || 'review') }}
+      PR_NUM: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
+      SKIP_CATEGORIES: ${{ github.event.inputs.skip_categories }}
+      MIN_SEVERITY: ${{ github.event.inputs.min_severity }}
+      SKIP_IDS: ${{ github.event.inputs.skip_ids }}
       # dispatch runs take mode from the input; label events keep the old rule
       MODE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode || (github.event.action == 'labeled' && 'fix' || 'review') }}
       PR_NUM: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
@@ -112,9 +147,27 @@ jobs:
             } >> "$GITHUB_OUTPUT"
           fi
 
+      # Dispatch runs carry no pull_request payload, so head/base/url are
+      # fetched from the API; PR events read them straight off the event.
+      - name: Resolve PR context
+        id: pr
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            gh pr view "$PR_NUM" --repo "${{ github.repository }}" \
+              --json headRefName,baseRefName,url \
+              --jq '"head_ref=\(.headRefName)\nbase_ref=\(.baseRefName)\npr_url=\(.url)"' >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "head_ref=${{ github.event.pull_request.head.ref }}"
+              echo "base_ref=${{ github.event.pull_request.base.ref }}"
+              echo "pr_url=${{ github.event.pull_request.html_url }}"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
+          ref: ${{ steps.pr.outputs.head_ref }}
           ref: ${{ steps.pr.outputs.head_ref }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -141,8 +194,10 @@ jobs:
           git config user.name "ai-autofix[bot]"
           git config user.email "ai-autofix@users.noreply.github.com"
           FIX_BRANCH="autofix/pr-${PR_NUM}"
+          FIX_BRANCH="autofix/pr-${PR_NUM}"
           git checkout -B "$FIX_BRANCH"
           echo "FIX_BRANCH=$FIX_BRANCH" >> "$GITHUB_ENV"
+          echo "FEATURE_BRANCH=${{ steps.pr.outputs.head_ref }}" >> "$GITHUB_ENV"
           echo "FEATURE_BRANCH=${{ steps.pr.outputs.head_ref }}" >> "$GITHUB_ENV"
           echo "BASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
@@ -161,7 +216,20 @@ jobs:
           CHANGED=$(gh pr view "$PR_NUM" --json files \
             --jq '.files[] | select(.path | test("\\.(ts|tsx|js|jsx)$")) | .path' \
             | while IFS= read -r p; do [ -f "$p" ] && printf '%s\n' "$p"; done)
+          BASE_REF="${{ steps.pr.outputs.base_ref }}"
+          git fetch origin "$BASE_REF" || true
+          # Changed files come from the GitHub API, NOT `git diff`. The old
+          # `git diff origin/$BASE...HEAD` broke when the PR branch was not
+          # branched off the base (unrelated merge-base => empty file list =>
+          # reviewer saw nothing => false "0 issues"). The API returns the
+          # PR's real file list regardless of branch topology or renames.
+          # Renames are represented as the new path with status "renamed";
+          # we take the current (new) path and skip deleted files.
+          CHANGED=$(gh pr view "$PR_NUM" --json files \
+            --jq '.files[] | select(.path | test("\\.(ts|tsx|js|jsx)$")) | .path' \
+            | while IFS= read -r p; do [ -f "$p" ] && printf '%s\n' "$p"; done)
           if [ -z "$CHANGED" ]; then
+            echo "No existing JS/TS files in this PR. Nothing to do."
             echo "No existing JS/TS files in this PR. Nothing to do."
             echo "AUTOFIX_STATUS=skipped" >> "$GITHUB_ENV"
             exit 0
@@ -203,6 +271,27 @@ jobs:
           clean_json() { # $1=raw $2=out $3=fallback
             sed -n '/[{[]/,$p' "$1" | tac | sed -n '/[]}]/,$p' | tac > "$2" || true
             jq -e . "$2" >/dev/null 2>&1 || printf '%s' "$3" > "$2"
+          }
+
+          # Replace the reviewer's per-run sequential ids with a stable
+          # 8-char content hash of (file + normalized problem). This lets a
+          # lead's per-issue skip_ids, chosen from a REVIEW run, still match
+          # the same issues when a later FIX run re-reviews the code. Wording
+          # drift by the LLM can still shift an id (best-effort; category /
+          # severity skip remain the deterministic path).
+          assign_stable_ids() { # $1 = json file {"issues":[...]}
+            local f="$1"
+            jq -r '.issues[]? | ((.file // "") + "::" + ((.problem // "") | ascii_downcase | gsub("\\s+";" ") | gsub("^ +| +$";"")))' "$f" > /tmp/agents/idkeys.txt 2>/dev/null || true
+            # (separator '::' guards against file/problem boundary collisions)
+            : > /tmp/agents/idvals.txt
+            while IFS= read -r line; do
+              printf '%s' "$line" | sha1sum | cut -c1-8
+            done < /tmp/agents/idkeys.txt >> /tmp/agents/idvals.txt
+            local ids_json
+            ids_json=$(jq -R . /tmp/agents/idvals.txt | jq -s .)
+            jq --argjson ids "$ids_json" \
+              '.issues = [ .issues | to_entries[] | .value + {id: ($ids[.key] // (.key|tostring))} ]' \
+              "$f" > /tmp/agents/idtmp.json && mv /tmp/agents/idtmp.json "$f"
           }
 
           # Replace the reviewer's per-run sequential ids with a stable
@@ -273,12 +362,48 @@ jobs:
             fi
             if [ "$(jq '[.issues[]?] | length' /tmp/agents/to_validate.json)" = "0" ]; then
               jq '{valid_issues: [], discarded: .}' /tmp/agents/skipped.json > /tmp/agents/valid.json
+            # Lead/config skip rules (SKIP_CATEGORIES, MIN_SEVERITY, SKIP_IDS)
+            # are enforced here — the ONE place issues get discarded — as a
+            # deterministic jq filter ahead of the LLM validator. Skipped
+            # issues are merged into .discarded so they hit the audit trail,
+            # the discarded-issue memory, and the verifier's no-re-raise list.
+            case "${MIN_SEVERITY:-low}" in
+              critical) MIN_RANK=4 ;;
+              high)     MIN_RANK=3 ;;
+              medium)   MIN_RANK=2 ;;
+              *)        MIN_RANK=1 ;;
+            esac
+            SKIP_CATS_JSON=$(printf '%s\n' "${SKIP_CATEGORIES:-}" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$";"") | ascii_downcase) | map(select(length > 0))')
+            SKIP_IDS_JSON=$(printf '%s\n' "${SKIP_IDS:-}" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$";"")) | map(select(length > 0))')
+            jq --argjson cats "$SKIP_CATS_JSON" --argjson ids "$SKIP_IDS_JSON" --argjson min "$MIN_RANK" '
+              def rank: ({"critical":4,"high":3,"medium":2,"low":1}[(.severity // "low") | ascii_downcase]) // 1;
+              def skip_reason:
+                ((.category // "") | ascii_downcase) as $cat | (.id | tostring) as $iid
+                | if ($cats | index($cat)) != null then "discarded: skipped by lead/config (category \(.category))"
+                  elif rank < $min then "discarded: skipped by lead/config (severity \(.severity) below minimum)"
+                  elif ($ids | index($iid)) != null then "discarded: skipped by lead/config (issue id \(.id))"
+                  else null end;
+              { issues: [.issues[]? | select(skip_reason == null)],
+                skipped: [.issues[]? | skip_reason as $r | select($r != null) | {id, reason: $r}] }
+            ' /tmp/agents/issues.json > /tmp/agents/skipsplit.json
+            jq '{issues: .issues}' /tmp/agents/skipsplit.json > /tmp/agents/to_validate.json
+            jq '[.skipped[]?]' /tmp/agents/skipsplit.json > /tmp/agents/skipped.json
+            N_SKIPPED=$(jq 'length' /tmp/agents/skipped.json)
+            if [ "$N_SKIPPED" != "0" ]; then
+              echo "Skip rules discarded $N_SKIPPED issue(s) before validation."
+            fi
+            if [ "$(jq '[.issues[]?] | length' /tmp/agents/to_validate.json)" = "0" ]; then
+              jq '{valid_issues: [], discarded: .}' /tmp/agents/skipped.json > /tmp/agents/valid.json
               return
             fi
             { echo "CODE:"; cat /tmp/agents/code.txt; echo
               echo "RAISED ISSUES:"; cat /tmp/agents/to_validate.json; } > /tmp/agents/usr.txt
+              echo "RAISED ISSUES:"; cat /tmp/agents/to_validate.json; } > /tmp/agents/usr.txt
             call_agent /tmp/agents/validator.sys /tmp/agents/usr.txt /tmp/agents/raw.txt
             clean_json /tmp/agents/raw.txt /tmp/agents/valid.json '{"valid_issues":[],"discarded":[]}'
+            jq -s '.[0].discarded = (.[1] + (.[0].discarded // [])) | .[0]' \
+              /tmp/agents/valid.json /tmp/agents/skipped.json > /tmp/agents/valid.tmp
+            mv /tmp/agents/valid.tmp /tmp/agents/valid.json
             jq -s '.[0].discarded = (.[1] + (.[0].discarded // [])) | .[0]' \
               /tmp/agents/valid.json /tmp/agents/skipped.json > /tmp/agents/valid.tmp
             mv /tmp/agents/valid.tmp /tmp/agents/valid.json
@@ -297,13 +422,16 @@ jobs:
           BUGS: missing await on async calls; unhandled promise rejections; null/undefined access; loose equality (==); infinite loops and off-by-one errors; division by zero and unhandled edge cases; 'any' types including 'as any' casts; error suppression comments (@ts-ignore, @ts-expect-error, ts-nocheck, eslint-disable) hiding real problems.
           OPTIMIZATIONS: repeated/unnecessary work, avoidable O(n^2) patterns, blocking synchronous calls on hot paths. Only flag optimizations with a real, measurable benefit.
           For every issue also include "confidence": an integer 0-100 for how certain you are it is a genuine, correctly-scoped issue (100 = certain, below 50 = speculative).
+          For every issue also include "confidence": an integer 0-100 for how certain you are it is a genuine, correctly-scoped issue (100 = certain, below 50 = speculative).
           Required output:
+          {"issues":[{"id":1,"file":"path","category":"security|bug|optimization","severity":"critical|high|medium|low","problem":"...","suggested_fix":"...","confidence":85}]}
           {"issues":[{"id":1,"file":"path","category":"security|bug|optimization","severity":"critical|high|medium|low","problem":"...","suggested_fix":"...","confidence":85}]}
           Use {"issues":[]} if the code is clean.
           EOF
 
           cat > /tmp/agents/validator.sys <<'EOF'
           You are AGENT 2 - VALIDATOR. You receive source code and a list of raised issues. Independently verify EVERY issue against the actual code. Discard: false positives, duplicates, pure style nitpicks, and optimizations with no real benefit or that risk changing behaviour. Keep everything genuine - never discard a real security issue.
+          Keep each valid issue object's fields intact (id, file, category, severity, problem, suggested_fix); carry over its "confidence" (you may lower it when the evidence is weaker than the reviewer claimed).
           Keep each valid issue object's fields intact (id, file, category, severity, problem, suggested_fix); carry over its "confidence" (you may lower it when the evidence is weaker than the reviewer claimed).
           Required output:
           {"valid_issues":[<the input issue objects that are genuine>],"discarded":[{"id":1,"reason":"..."}]}
@@ -329,6 +457,7 @@ jobs:
           fi
           clean_json /tmp/agents/raw.txt /tmp/agents/issues.json '{"issues":[]}'
           assign_stable_ids /tmp/agents/issues.json
+          assign_stable_ids /tmp/agents/issues.json
           N_ISSUES=$(jq '[.issues[]?] | length' /tmp/agents/issues.json)
           echo "AGENT 1 (Reviewer) raised $N_ISSUES issue(s)."
 
@@ -347,6 +476,14 @@ jobs:
                 md_table /tmp/agents/show.json
                 echo
                 echo "> **Add the \`auto-fix\` label** to this PR and the pipeline will fix these automatically in a sub-PR."
+                echo "> Or use the Auto-Fix panel to skip individual issues, then run a fix."
+              fi
+              # Machine-readable block for the Auto-Fix panel: validated issues
+              # with their STABLE content-hash ids. Hidden in an HTML comment so
+              # it doesn't clutter the human-facing review. The panel parses this
+              # to render per-issue skip checkboxes; unticked ids go to skip_ids.
+              echo
+              printf '<!-- AF_ISSUES %s -->\n' "$(jq -c '[.[] | {id, severity, category, file, problem, confidence}]' /tmp/agents/show.json)"
                 echo "> Or use the Auto-Fix panel to skip individual issues, then run a fix."
               fi
               # Machine-readable block for the Auto-Fix panel: validated issues
@@ -472,6 +609,7 @@ jobs:
             echo "## 🤖 Multi-agent auto-fix for #$PR_NUM (Claude Code)"
             echo
             echo "Source PR: ${{ steps.pr.outputs.pr_url }} — pipeline status: **$STATUS**"
+            echo "Source PR: ${{ steps.pr.outputs.pr_url }} — pipeline status: **$STATUS**"
             echo
             echo "### ✅ Issues fixed ($N_FIXED)"
             if [ "$N_FIXED" = "0" ]; then echo "_None_"; else md_table /tmp/agents/fixed.json; fi
@@ -561,6 +699,7 @@ jobs:
               --base "$FEATURE_BRANCH" \
               --head "$FIX_BRANCH" \
               --title "AI auto-fix for PR #${PR_NUM} [${AUTOFIX_STATUS}]" \
+              --title "AI auto-fix for PR #${PR_NUM} [${AUTOFIX_STATUS}]" \
               --body-file /tmp/agents/summary.md \
               --reviewer "$TEAM_LEAD"
           fi
@@ -571,8 +710,10 @@ jobs:
           [ -f /tmp/agents/audit.md ] || exit 0
           if git diff --quiet "$BASE_SHA" HEAD; then
             TARGET="$PR_NUM"
+            TARGET="$PR_NUM"
           else
             TARGET=$(gh pr list --head "$FIX_BRANCH" --state open --json number --jq '.[0].number // empty')
+            [ -n "$TARGET" ] || TARGET="$PR_NUM"
             [ -n "$TARGET" ] || TARGET="$PR_NUM"
           fi
           gh pr comment "$TARGET" --body-file /tmp/agents/audit.md
