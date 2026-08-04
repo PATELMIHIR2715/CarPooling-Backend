@@ -166,6 +166,18 @@ jobs:
             echo "AUTOFIX_STATUS=skipped" >> "$GITHUB_ENV"
             exit 0
           fi
+          # Paths with spaces would word-split in the unquoted $CHANGED uses
+          # below and abort the whole step under set -e — skip them loudly.
+          if printf '%s\n' "$CHANGED" | grep -q ' '; then
+            echo "WARNING: skipping file(s) with spaces in the name (unsupported):"
+            printf '%s\n' "$CHANGED" | grep ' ' || true
+            CHANGED=$(printf '%s\n' "$CHANGED" | grep -v ' ' || true)
+            if [ -z "$CHANGED" ]; then
+              echo "All changed files skipped. Nothing to do."
+              echo "AUTOFIX_STATUS=skipped" >> "$GITHUB_ENV"
+              exit 0
+            fi
+          fi
           echo "Mode: $MODE"; echo "Files in scope:"; echo "$CHANGED"
           mkdir -p /tmp/agents
           printf '%s\n' $CHANGED > /tmp/agents/changed.txt
@@ -344,6 +356,14 @@ jobs:
               echo
               printf '<!-- AF_ISSUES %s -->\n' "$(jq -c '[.[] | {id, severity, category, file, problem, confidence}]' /tmp/agents/show.json)"
             } > /tmp/agents/review.md
+            # Keep under GitHub's 65,536-char comment limit; preserve AF_ISSUES
+            # (last line) and trim the human table if needed.
+            if [ "$(wc -c < /tmp/agents/review.md)" -gt 65000 ]; then
+              tail -1 /tmp/agents/review.md > /tmp/agents/review.block
+              BLK=$(wc -c < /tmp/agents/review.block)
+              head -c $((64800 - BLK)) /tmp/agents/review.md > /tmp/agents/review.trim
+              { cat /tmp/agents/review.trim; echo; echo "_...table truncated (comment size limit)..._"; cat /tmp/agents/review.block; } > /tmp/agents/review.md
+            fi
             gh pr comment "$PR_NUM" --body-file /tmp/agents/review.md
             echo "AUTOFIX_STATUS=review-only" >> "$GITHUB_ENV"
             exit 0
@@ -351,7 +371,10 @@ jobs:
 
           # ================ FIX MODE ================
           npx tsc --noEmit > /tmp/agents/tsc.base 2>&1 || true
-          grep -E 'error TS' /tmp/agents/tsc.base | grep -vFf /tmp/agents/changed.txt | sort -u > /tmp/agents/tsc.baseline || true
+          # Exact-path exclusion: tsc lines start "path(line,col): error TS..." —
+          # match on the path before "(" so a changed path quoted inside another
+          # file's error message can't wrongly drop that error from the baseline.
+          grep -E 'error TS' /tmp/agents/tsc.base             | awk -F'(' 'NR==FNR { c[$0]=1; next } !($1 in c)' /tmp/agents/changed.txt -             | sort -u > /tmp/agents/tsc.baseline || true
           if [ -s /tmp/agents/tsc.baseline ]; then
             echo "NOTE: $(wc -l < /tmp/agents/tsc.baseline) pre-existing tsc error(s) outside the PR's files - excluded from the gate."
           fi
@@ -504,11 +527,21 @@ jobs:
           AF_LD=$(git diff --numstat "$BASE_SHA" HEAD | awk '{d+=$2} END{print d+0}')
           AF_MODS=$(git diff --name-only "$BASE_SHA" HEAD | awk -F/ 'NF>1{print $2} NF==1{print $1}' | sort -u | jq -R . | jq -s -c . 2>/dev/null || echo '[]')
           AF_RISK=low; [ "${N_OPEN:-0}" != "0" ] && AF_RISK=high
-          AF_IMPACT=$(jq -n --argjson fc "${AF_FC:-0}" --argjson la "${AF_LA:-0}" --argjson ld "${AF_LD:-0}" --argjson mods "${AF_MODS:-[]}" --arg risk "$AF_RISK" \
+          AF_IMPACT=$(jq -n -c --argjson fc "${AF_FC:-0}" --argjson la "${AF_LA:-0}" --argjson ld "${AF_LD:-0}" --argjson mods "${AF_MODS:-[]}" --arg risk "$AF_RISK" \
             '{filesChanged:$fc, locAdded:$la, locRemoved:$ld, criticalModules:$mods, risk:$risk}')
-          AF_RESULTS=$(jq -n --argjson fixed "${AF_FIXED:-[]}" --argjson open "${AF_OPEN:-[]}" --argjson impact "$AF_IMPACT" \
+          AF_RESULTS=$(jq -n -c --argjson fixed "${AF_FIXED:-[]}" --argjson open "${AF_OPEN:-[]}" --argjson impact "$AF_IMPACT" \
             '{fixed:$fixed, open:$open, impact:$impact}')
-          printf '\n<!-- AF_RESULTS %s -->\n' "$AF_RESULTS" >> /tmp/agents/summary.md
+          # Budget the whole body under GitHub's 65,536-char PR-body limit:
+          # write the machine block first, then trim the human part to fit.
+          printf '\n<!-- AF_RESULTS %s -->\n' "$AF_RESULTS" > /tmp/agents/af.block
+          BLOCK_LEN=$(wc -c < /tmp/agents/af.block)
+          if [ "$BLOCK_LEN" -gt 40000 ]; then
+            printf '\n<!-- AF_RESULTS %s -->\n' "$(jq -n -c --argjson impact "$AF_IMPACT" '{fixed:[], open:[], impact:$impact, truncated:true}')" > /tmp/agents/af.block
+            BLOCK_LEN=$(wc -c < /tmp/agents/af.block)
+          fi
+          head -c $((65000 - BLOCK_LEN)) /tmp/agents/summary.md > /tmp/agents/summary.trim
+          mv /tmp/agents/summary.trim /tmp/agents/summary.md
+          cat /tmp/agents/af.block >> /tmp/agents/summary.md
 
       - name: Open or update sub-PR with fixed/open issue report
         if: ${{ env.MODE == 'fix' }}

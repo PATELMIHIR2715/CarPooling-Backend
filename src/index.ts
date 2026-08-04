@@ -40,6 +40,7 @@ import {
   CHAT,
   PAYMENT,
   WEBHOOK,
+  BOOK,
 } from "./constants/routes.js";
 import {
   CORS_PREFLIGHT_PATH,
@@ -94,8 +95,8 @@ app.use(`${API}${CAR}`, carRoutes);
 app.use(`${API}${TRIP}`, tripRoutes);
 app.use(`${API}${BOOKING}`, bookingRoutes);
 app.use(`${API}${LOCATION}`, locationRoutes);
-app.use(`${API}${PASSENGER}`, passengerTripRoutes);
-app.use(`${API}${PASSENGER}`, passengerBookingRoutes);
+app.use(`${API}${PASSENGER}${TRIP}`, passengerTripRoutes);
+app.use(`${API}${PASSENGER}${BOOK}`, passengerBookingRoutes);
 app.use(`${API}${RATING}`, ratingRoutes);
 app.use(`${API}${ADMIN}`, userRoutes);
 app.use(`${API}${ADMIN}`, dashboardRoutes);
