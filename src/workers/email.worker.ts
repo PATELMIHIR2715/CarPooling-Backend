@@ -113,6 +113,7 @@ export const startEmailWorker = () => {
             )
           );
           break;
+
         case EMAIL_JOBS.BOOKING_AMOUNT_RECEIVED:
           await sendEmail(
             data.to,
