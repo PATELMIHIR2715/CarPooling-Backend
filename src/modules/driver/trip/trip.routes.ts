@@ -21,6 +21,13 @@ router.get(
 );
 
 router.get(
+  "/startable",
+  authenticate,
+  authorize([DRIVER_ROLE]),
+  tripController.getStartableTrips
+);
+
+router.get(
   TRIPID,
   authenticate,
   authorize([DRIVER_ROLE]),

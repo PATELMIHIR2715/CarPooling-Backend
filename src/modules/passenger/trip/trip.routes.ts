@@ -7,6 +7,13 @@ import { PASSENGER_ROLE } from "../../../constants/labels.js";
 const router = Router();
 
 router.post(
+  "/feed",
+  authenticate,
+  authorize([PASSENGER_ROLE]),
+  tripController.getTripsFeed
+);
+
+router.post(
   GET_TRIPS,
   authenticate,
   authorize([PASSENGER_ROLE]),

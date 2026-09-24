@@ -33,6 +33,16 @@ class TripController {
     }
   }
 
+  async getStartableTrips(req: any, res: Response) {
+    try {
+      const driverId = req.user.userId;
+      const trips = await tripService.getStartableTrips(driverId);
+      successResponse(res, trips, 200);
+    } catch (error) {
+      errorResponseStandard(error, res);
+    }
+  }
+
   async getTripById(req: any, res: Response) {
     try {
       const tripId = req.params.tripId ?? req.params.tripid;

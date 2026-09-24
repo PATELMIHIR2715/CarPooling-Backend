@@ -42,6 +42,7 @@ import {
   TRIP_COMPLETED,
   TRIP_NOT_FOUND,
   TRIP_NOT_SCHEDULED,
+  TRIP_START_TIME_NOT_REACHED,
   UNAUTHORIZED,
   UNAUTHORIZED_ACCESS,
   UNAUTHORIZED_CANCEL,
@@ -142,6 +143,7 @@ export const errorResponseStandard = (
     [PAYMENT_NOT_MADE]: 422,
     [TRIP_COMPLETED]: 409,
     [TRIP_NOT_SCHEDULED]: 409,
+    [TRIP_START_TIME_NOT_REACHED]: 409,
   };
 
   const responseStatus = mappedStatusCodes[message] ?? statusCode;

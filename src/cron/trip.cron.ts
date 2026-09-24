@@ -1,6 +1,6 @@
 import cron from "node-cron";
 
-import { COMPLETED, ONGOING, SCHEDULED } from "../constants/labels.js";
+import { COMPLETED, ONGOING } from "../constants/labels.js";
 import prisma from "../config/database.js";
 import {
   TRIP_CRON_ERROR,
@@ -12,11 +12,6 @@ export const startTripCron = () => {
   cron.schedule("* * * * *", async () => {
     try {
       const now = new Date();
-
-      await prisma.ride.updateMany({
-        where: { status: SCHEDULED, departureTime: { lte: now } },
-        data: { status: ONGOING },
-      });
 
       await prisma.ride.updateMany({
         where: { status: ONGOING, endTime: { lte: now } },

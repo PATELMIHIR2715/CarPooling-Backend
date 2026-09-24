@@ -3,6 +3,7 @@ import {
   TRIP_COMPLETED,
   TRIP_NOT_FOUND,
   TRIP_NOT_SCHEDULED,
+  TRIP_START_TIME_NOT_REACHED,
   UNAUTHORIZED_ACCESS,
 } from "../../../constants/messages.js";
 import { COMPLETED, SCHEDULED } from "../../../constants/labels.js";
@@ -34,6 +35,9 @@ export const validateStartTrip = (trip: any, userId: string) => {
   }
   if (trip.status !== SCHEDULED) {
     throw new Error(TRIP_NOT_SCHEDULED);
+  }
+  if (trip.departureTime > new Date()) {
+    throw new Error(TRIP_START_TIME_NOT_REACHED);
   }
 };
 

@@ -1,6 +1,10 @@
 import type { Response } from "express";
 import tripService from "./trip.service.js";
-import { bookTripSchema, searchTripSchema } from "./trip.validator.js";
+import {
+  bookTripSchema,
+  feedTripSchema,
+  searchTripSchema,
+} from "./trip.validator.js";
 import { buildFilterQuery } from "../../../utils/buildquery.utils.js";
 import { TRIP_FILTERS } from "../../../filters/trip.filter.js";
 import {
@@ -9,6 +13,17 @@ import {
 } from "../../../utils/response.utils.js";
 
 class PassengerTripController {
+  async getTripsFeed(req: any, res: Response) {
+    try {
+      const data = feedTripSchema.parse(req.body);
+      const filter = buildFilterQuery(req.body, TRIP_FILTERS);
+      const trips = await tripService.getTripsFeed(data, filter);
+      successResponse(res, trips, 200);
+    } catch (error) {
+      errorResponseStandard(error, res);
+    }
+  }
+
   async getTripsBySearch(req: any, res: Response) {
     try {
       const data = searchTripSchema.parse(req.body);

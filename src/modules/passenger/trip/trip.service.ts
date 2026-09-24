@@ -1,5 +1,5 @@
 import prisma from "../../../config/database.js";
-import { CANCELLED, COMPLETED } from "../../../constants/labels.js";
+import { CANCELLED, COMPLETED, SCHEDULED } from "../../../constants/labels.js";
 import {
   NOT_ENOUGH_SEATS,
   PICKUP_DROPOFF_LOCATION_INVALID,
@@ -16,12 +16,17 @@ import {
   haversineDistance,
   type LocationPoint,
 } from "../../../utils/location.utils.js";
-import type { BookTripInput, SearchTripInput } from "./trip.validator.js";
+import type {
+  BookTripInput,
+  FeedTripInput,
+  SearchTripInput,
+} from "./trip.validator.js";
 import { buildPaginationMeta } from "../../../utils/buildquery.utils.js";
 
 const SEARCH_THRESHOLD_KM = 5;
 const BOOKING_THRESHOLD_KM = 2;
 const SAME_LOCATION_THRESHOLD_KM = 0.5;
+const LATITUDE_KM = 111.32;
 
 const isLocationPoint = (value: unknown): value is LocationPoint => {
   if (!value || typeof value !== "object") {
@@ -84,6 +89,82 @@ const buildRideRoutePoints = (trip: {
 };
 
 class TripService {
+  async getTripsFeed(data: FeedTripInput, filter: any) {
+    const latitudeDelta = data.radiusKm / LATITUDE_KM;
+    const longitudeDelta =
+      data.radiusKm /
+      (LATITUDE_KM *
+        Math.max(Math.cos((data.currentLocation.lat * Math.PI) / 180), 0.01));
+
+    const baseWhere = {
+      AND: [
+        ...(filter.where?.AND ?? []),
+        { status: SCHEDULED },
+        { availableSeats: { gte: data.seats } },
+        { departureTime: { gte: new Date() } },
+        { originLat: { not: null } },
+        { originLon: { not: null } },
+        {
+          originLat: {
+            gte: data.currentLocation.lat - latitudeDelta,
+            lte: data.currentLocation.lat + latitudeDelta,
+          },
+        },
+        {
+          originLon: {
+            gte: data.currentLocation.lon - longitudeDelta,
+            lte: data.currentLocation.lon + longitudeDelta,
+          },
+        },
+      ],
+    };
+
+    const trips = await prisma.ride.findMany({
+      where: baseWhere,
+      orderBy: filter.orderBy,
+      include: {
+        driver: { select: { name: true, email: true, phone: true } },
+        car: true,
+      },
+    });
+
+    const nearbyTrips = trips
+      .map((trip) => {
+        const distanceFromCurrentLocationKm = haversineDistance(
+          data.currentLocation.lat,
+          data.currentLocation.lon,
+          trip.originLat ?? 0,
+          trip.originLon ?? 0
+        );
+
+        return {
+          ...trip,
+          distanceFromCurrentLocationKm,
+        };
+      })
+      .filter(
+        (trip) => trip.distanceFromCurrentLocationKm <= data.radiusKm
+      )
+      .sort(
+        (a, b) =>
+          a.distanceFromCurrentLocationKm - b.distanceFromCurrentLocationKm
+      );
+
+    const paginatedTrips = nearbyTrips.slice(
+      filter.skip,
+      filter.skip + filter.take
+    );
+
+    return {
+      data: paginatedTrips,
+      meta: buildPaginationMeta(
+        nearbyTrips.length,
+        Math.ceil(filter.skip / filter.take) + 1,
+        filter.take
+      ),
+    };
+  }
+
   async getTripsBySearch(data: SearchTripInput, filter: any) {
     const baseWhere = {
       ...filter.where,
