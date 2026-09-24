@@ -6,6 +6,7 @@ import {
   BOOKINGID,
   BOOKINGS,
   CANCEL,
+  ROOT,
   TRIPID,
   WAITLIST,
 } from "../../../constants/routes.js";
@@ -13,21 +14,21 @@ import {
 const router = Router();
 
 router.get(
-  BOOKINGS,
+  ROOT,
   authenticate,
   authorize([PASSENGER_ROLE]),
   PassengerController.getAllBookings
 );
 
 router.put(
-  `${BOOKINGS}${BOOKINGID}${CANCEL}`,
+  `${BOOKINGID}${CANCEL}`,
   authenticate,
   authorize([PASSENGER_ROLE]),
   PassengerController.cancelBooking
 );
 
 router.post(
-  `${BOOKINGS}${TRIPID}${WAITLIST}`,
+  `${TRIPID}${WAITLIST}`,
   authenticate,
   authorize([PASSENGER_ROLE]),
   PassengerController.joinWaitlist
