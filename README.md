@@ -11,6 +11,8 @@ Node.js, Express, TypeScript, Prisma, PostgreSQL, Redis, Razorpay, and Socket.IO
 - Trip creation with driver-defined `pricePerKm`
 - Distance-based booking pricing for partial-route passengers
 - Trip search, booking, waitlist, pickup OTP, and trip status flows
+- Passenger nearby trip feed using a 5 km default origin radius
+- Manual driver trip start flow for live tracking handoff
 - Admin dashboards, users, documents, and trip management
 - Real-time chat with Socket.IO
 - Ratings and reviews after completed trips
@@ -135,6 +137,7 @@ All application routes are prefixed with `/api`.
 - `GET /api/car/documents`
 - `POST /api/trip` (`pricePerKm` required)
 - `GET /api/trip`
+- `GET /api/trip/startable`
 - `GET /api/trip/:tripId`
 - `PUT /api/trip/:tripId/start`
 - `POST /api/trip/:tripId/pickup/:bookingId`
@@ -144,11 +147,12 @@ All application routes are prefixed with `/api`.
 
 ### Passenger
 
-- `POST /api/passenger/get-trips`
-- `POST /api/passenger/:tripId/book`
-- `GET /api/passenger/bookings`
-- `PUT /api/passenger/bookings/:bookingId/cancel`
-- `POST /api/passenger/bookings/:tripId/waitlist`
+- `POST /api/passenger/trip/feed`
+- `POST /api/passenger/trip/get-trips`
+- `POST /api/passenger/trip/:tripId/book`
+- `GET /api/passenger/book/bookings`
+- `PUT /api/passenger/book/bookings/:bookingId/cancel`
+- `POST /api/passenger/book/bookings/:tripId/waitlist`
 
 ### Payment
 
@@ -177,6 +181,10 @@ All application routes are prefixed with `/api`.
 - `GET /api/chat/get-my-chats`
 - `GET /api/chat/:chatId/messages`
 - `POST /api/chat`
+
+## Mobile App Documentation
+
+See [docs/mobile-app-api.md](docs/mobile-app-api.md) for the Flutter mobile API contract, including nearby feed, manual driver start popup, and Firebase Realtime Database tracking flow.
 
 ## Response Format
 

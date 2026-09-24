@@ -78,6 +78,7 @@ export const BOOKING_ALREADY_CANCELLED = "Booking is already cancelled";
 export const TRIP_COMPLETED = "Trip is already completed";
 export const UNAUTHORIZED_CANCEL = "Unauthorized to cancel this booking";
 export const TRIP_NOT_SCHEDULED = "Trip is not scheduled";
+export const TRIP_START_TIME_NOT_REACHED = "Trip start time has not arrived";
 export const DOCUMENTS_NOT_APPROVED = "Your documents not approved";
 export const DRIVER_CAR_NOT_FOUND = "Driver does not have a car registered";
 export const OTP_SENT_SUCCESSFULLY = "OTP sent successfully";

@@ -1,10 +1,12 @@
 import prisma from "../../../config/database.js";
 import {
+  ACCEPTED,
   APPROVED,
   CANCELLED,
   COMPLETED,
   ONGOING,
   PICKEDUP,
+  SCHEDULED,
 } from "../../../constants/labels.js";
 import {
   DOCUMENTS_NOT_APPROVED,
@@ -97,6 +99,26 @@ class TripService {
     return trips;
   }
 
+  async getStartableTrips(driverId: string) {
+    return prisma.ride.findMany({
+      where: {
+        driverId,
+        status: SCHEDULED,
+        departureTime: { lte: new Date() },
+      },
+      orderBy: { departureTime: "asc" },
+      include: {
+        bookings: {
+          where: { status: ACCEPTED },
+          include: {
+            passenger: { select: { name: true, email: true, phone: true } },
+          },
+        },
+        car: true,
+      },
+    });
+  }
+
   async getTripById(tripId: string) {
     const trip = await prisma.ride.findUnique({
       where: {
@@ -113,7 +135,13 @@ class TripService {
   async startTrip(tripId: string, userId: string) {
     const trip = await prisma.ride.findUnique({
       where: { id: tripId },
-      include: { driver: true, bookings: { include: { passenger: true } } },
+      include: {
+        driver: true,
+        bookings: {
+          where: { status: ACCEPTED },
+          include: { passenger: true },
+        },
+      },
     });
 
     if (!trip) {
@@ -136,7 +164,14 @@ class TripService {
       );
     }
 
-    return result;
+    return {
+      trip: result,
+      tracking: {
+        provider: "firebase_realtime_database",
+        tripId,
+        databasePath: `tripTracking/${tripId}`,
+      },
+    };
   }
 
   async sendPickupOtp(tripId: string, bookingId: string, driverId: string) {
