@@ -14,14 +14,26 @@ import {
   EMAIL_QUEUE_NAME,
 } from "../constants/labels.js";
 
-const connection = {
+export const emailQueueConnection = {
   host: new URL(env.UPSTASH_REDIS_URL).hostname,
   port: 6379,
   password: env.UPSTASH_REDIS_TOKEN,
   tls: {},
+  maxRetriesPerRequest: null,
 };
 
-export const emailQueue = new Queue(EMAIL_QUEUE_NAME, { connection });
+export const emailQueue = new Queue(EMAIL_QUEUE_NAME, {
+  connection: emailQueueConnection,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: {
+      type: "exponential",
+      delay: 5000,
+    },
+    removeOnComplete: 100,
+    removeOnFail: 500,
+  },
+});
 
 export const EMAIL_JOBS = {
   WELCOME: EMAIL_JOB_WELCOME,

@@ -65,6 +65,8 @@ const port = env.PORT || 8000;
 const httpServer = createServer(app);
 const io = initSocket(httpServer);
 
+app.set("trust proxy", 1);
+
 const genralRateLimiter = ratelimit({
   windowMs: 15 * 60 * 1000,
   max: 100,

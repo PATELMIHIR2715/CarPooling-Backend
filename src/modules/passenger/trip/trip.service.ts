@@ -9,6 +9,7 @@ import {
   TRIP_NOT_FOUND,
 } from "../../../constants/messages.js";
 import type { TUser } from "../../../constants/types.js";
+import { emailProducer } from "../../../utils/emailProducer.utils.js";
 import {
   calculateRouteSegmentDistanceKm,
   findNearestPickupPoint,
@@ -215,6 +216,9 @@ class TripService {
   async bookTrip(bookingData: BookTripInput, user: TUser, tripId: string) {
     const trip = await prisma.ride.findUnique({
       where: { id: tripId },
+      include: {
+        driver: { select: { email: true, name: true } },
+      },
     });
     const currentBookings = await prisma.booking.aggregate({
       where: { AND: [{ tripId }, { passengerId: user.userId }] },
@@ -312,6 +316,17 @@ class TripService {
         data: { availableSeats: trip.availableSeats - bookingData.seats },
       }),
     ]);
+
+    await emailProducer.sendBookingRequestEmail(
+      trip.driver.email,
+      trip.driver.name,
+      user.name,
+      trip.origin,
+      trip.destinationLocation,
+      trip.departureTime.toISOString(),
+      bookingData.seats
+    );
+
     return booking;
   }
 }

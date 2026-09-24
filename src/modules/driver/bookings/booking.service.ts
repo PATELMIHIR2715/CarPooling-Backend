@@ -70,7 +70,8 @@ class BookingService {
       await emailProducer.sendBookingRejectionEmail(
         booking.passenger.email,
         booking.passenger.name,
-        booking.ride.driver.name
+        booking.ride.origin,
+        booking.ride.destinationLocation
       );
     }
 
