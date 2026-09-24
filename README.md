@@ -11,7 +11,7 @@ Node.js, Express, TypeScript, Prisma, PostgreSQL, Redis, Razorpay, and Socket.IO
 - Trip creation with driver-defined `pricePerKm`
 - Distance-based booking pricing for partial-route passengers
 - Trip search, booking, waitlist, pickup OTP, and trip status flows
-- Passenger nearby trip feed using a 5 km default origin radius
+- Passenger nearby trip feed using a 5 km default boarding-point radius
 - Manual driver trip start flow for live tracking handoff
 - Admin dashboards, users, documents, and trip management
 - Real-time chat with Socket.IO

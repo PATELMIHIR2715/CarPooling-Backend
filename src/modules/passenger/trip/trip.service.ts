@@ -26,7 +26,6 @@ import { buildPaginationMeta } from "../../../utils/buildquery.utils.js";
 const SEARCH_THRESHOLD_KM = 5;
 const BOOKING_THRESHOLD_KM = 2;
 const SAME_LOCATION_THRESHOLD_KM = 0.5;
-const LATITUDE_KM = 111.32;
 
 const isLocationPoint = (value: unknown): value is LocationPoint => {
   if (!value || typeof value !== "object") {
@@ -90,12 +89,6 @@ const buildRideRoutePoints = (trip: {
 
 class TripService {
   async getTripsFeed(data: FeedTripInput, filter: any) {
-    const latitudeDelta = data.radiusKm / LATITUDE_KM;
-    const longitudeDelta =
-      data.radiusKm /
-      (LATITUDE_KM *
-        Math.max(Math.cos((data.currentLocation.lat * Math.PI) / 180), 0.01));
-
     const baseWhere = {
       AND: [
         ...(filter.where?.AND ?? []),
@@ -104,18 +97,6 @@ class TripService {
         { departureTime: { gte: new Date() } },
         { originLat: { not: null } },
         { originLon: { not: null } },
-        {
-          originLat: {
-            gte: data.currentLocation.lat - latitudeDelta,
-            lte: data.currentLocation.lat + latitudeDelta,
-          },
-        },
-        {
-          originLon: {
-            gte: data.currentLocation.lon - longitudeDelta,
-            lte: data.currentLocation.lon + longitudeDelta,
-          },
-        },
       ],
     };
 
@@ -130,24 +111,34 @@ class TripService {
 
     const nearbyTrips = trips
       .map((trip) => {
-        const distanceFromCurrentLocationKm = haversineDistance(
-          data.currentLocation.lat,
-          data.currentLocation.lon,
-          trip.originLat ?? 0,
-          trip.originLon ?? 0
+        const boardingPoints = [
+          { ...getOriginPoint(trip), type: "origin" },
+          ...toPickupPoints(trip.pickupLocations).map((point) => ({
+            ...point,
+            type: "pickup",
+          })),
+        ];
+        const nearestBoardingPoint = findNearestPickupPoint(
+          data.currentLocation,
+          boardingPoints,
+          data.radiusKm
         );
 
         return {
           ...trip,
-          distanceFromCurrentLocationKm,
+          distanceFromCurrentLocationKm: nearestBoardingPoint.distance,
+          nearestBoardingPoint: nearestBoardingPoint.nearestPoint,
         };
       })
       .filter(
-        (trip) => trip.distanceFromCurrentLocationKm <= data.radiusKm
+        (trip) =>
+          trip.distanceFromCurrentLocationKm !== null &&
+          trip.distanceFromCurrentLocationKm <= data.radiusKm
       )
       .sort(
         (a, b) =>
-          a.distanceFromCurrentLocationKm - b.distanceFromCurrentLocationKm
+          (a.distanceFromCurrentLocationKm ?? Number.MAX_SAFE_INTEGER) -
+          (b.distanceFromCurrentLocationKm ?? Number.MAX_SAFE_INTEGER)
       );
 
     const paginatedTrips = nearbyTrips.slice(
