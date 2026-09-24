@@ -6,8 +6,8 @@ dns.setDefaultResultOrder("ipv4first");
 
 const transporter = nodemailer.createTransport({
   host: env.SMTP_HOST,
-  port: parseInt(env.SMTP_PORT),
-  secure: false, // true for 465, false for other ports
+  port: Number(env.SMTP_PORT),
+  secure: Number(env.SMTP_PORT) === 465,
   auth: {
     user: env.SMTP_USER,
     pass: env.SMTP_PASS,
