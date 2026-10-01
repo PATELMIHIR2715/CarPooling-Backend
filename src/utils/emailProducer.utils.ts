@@ -1,9 +1,13 @@
 import { emailQueue, EMAIL_JOBS } from "../config/queue.js";
 import { processEmailJob } from "./emailJobHandler.utils.js";
 
-const enqueueEmailJob = async (jobName: string, data: any) => {
+const enqueueEmailJob = async (
+  jobName: string,
+  data: any,
+  options: { priority?: number; lifo?: boolean } = {}
+) => {
   try {
-    await emailQueue.add(jobName, data);
+    await emailQueue.add(jobName, data, options);
   } catch (error) {
     console.error(
       `Email queue enqueue failed for ${jobName}. Sending directly.`,
@@ -17,12 +21,35 @@ export const emailProducer = {
   sendWelcomeEmail: async (to: string, name: string, role: string) => {
     await enqueueEmailJob(EMAIL_JOBS.WELCOME, { to, name, role });
   },
+
+  // High-priority direct fast-path for time-sensitive registration OTPs
   sendRegistrationOtpEmail: async (to: string, name: string, otp: string) => {
-    await enqueueEmailJob(EMAIL_JOBS.REGISTRATION_OTP, { to, name, otp });
+    try {
+      await processEmailJob(EMAIL_JOBS.REGISTRATION_OTP, { to, name, otp });
+    } catch (err) {
+      console.warn("Direct OTP send failed, falling back to BullMQ queue:", err);
+      await enqueueEmailJob(
+        EMAIL_JOBS.REGISTRATION_OTP,
+        { to, name, otp },
+        { priority: 1, lifo: true }
+      );
+    }
   },
+
+  // High-priority direct fast-path for login OTPs
   sendOtpEmail: async (to: string, name: string, otp: string) => {
-    await enqueueEmailJob(EMAIL_JOBS.OTP, { to, name, otp });
+    try {
+      await processEmailJob(EMAIL_JOBS.OTP, { to, name, otp });
+    } catch (err) {
+      console.warn("Direct OTP send failed, falling back to BullMQ queue:", err);
+      await enqueueEmailJob(
+        EMAIL_JOBS.OTP,
+        { to, name, otp },
+        { priority: 1, lifo: true }
+      );
+    }
   },
+
   sendTripStartEmail: async (
     to: string,
     name: string,
@@ -38,6 +65,7 @@ export const emailProducer = {
       destination,
     });
   },
+
   sendBookingRequestEmail: async (
     to: string,
     driverName: string,
@@ -57,6 +85,7 @@ export const emailProducer = {
       seats,
     });
   },
+
   sendBookingConfirmationEmail: async (
     to: string,
     passengerName: string,
@@ -74,6 +103,7 @@ export const emailProducer = {
       departureTime,
     });
   },
+
   sendBookingRejectionEmail: async (
     to: string,
     passengerName: string,
@@ -87,6 +117,7 @@ export const emailProducer = {
       destination,
     });
   },
+
   sendTripReminderEmail: async (to: string, name: string) => {
     await enqueueEmailJob(EMAIL_JOBS.TRIP_REMINDER, { to, name });
   },
