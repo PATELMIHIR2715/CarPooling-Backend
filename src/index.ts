@@ -82,11 +82,19 @@ const authLimiter = ratelimit({
 
 app.use(cors(corsOptions));
 
-// Open 24/7 Keep-Alive Health Check (Exempt from rate limits for Render cron pings)
-app.get(["/", HEALTH_ROUTE, "/api/health"], (_, res) => {
+// Open 24/7 Keep-Alive Health Check (Keeps Render awake & prevents Supabase from auto-pausing)
+app.get(["/", HEALTH_ROUTE, "/api/health"], async (_, res) => {
+  let dbStatus = "connected";
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch {
+    dbStatus = "disconnected";
+  }
+
   res.status(200).json({
     status: "ok",
-    message: "Service is active and healthy",
+    database: dbStatus,
+    message: "Service and database are active",
     uptime: `${Math.floor(process.uptime())}s`,
     timestamp: new Date().toISOString(),
   });
