@@ -49,6 +49,7 @@ import {
 } from "./constants/labels.js";
 import { initSocket } from "./socket/socket.js";
 import { startEmailWorker } from "./workers/email.worker.js";
+import transporter from "./config/mailer.js";
 import { successResponse } from "./utils/response.utils.js";
 import {
   DATABASE_CONNECTED,
@@ -122,6 +123,13 @@ httpServer.listen(port, () => {
       startBookingCron();
       startWaitlistCron();
       startEmailWorker();
+      transporter.verify((err) => {
+        if (err) {
+          console.warn("[SMTP] Pool warmup warning:", err.message);
+        } else {
+          console.log("[SMTP] Connection pool ready and pre-warmed for instant OTPs");
+        }
+      });
     })
     .catch((err: unknown) => console.error(DATABASE_CONNECTION_FAILED, err));
 });

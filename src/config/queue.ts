@@ -20,6 +20,8 @@ export const emailQueueConnection = {
   password: env.UPSTASH_REDIS_TOKEN,
   tls: {},
   maxRetriesPerRequest: null,
+  connectTimeout: 5000,
+  enableOfflineQueue: false,
 };
 
 export const emailQueue = new Queue(EMAIL_QUEUE_NAME, {
