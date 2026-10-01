@@ -36,6 +36,7 @@ class AuthService {
 
     const otp = generateRegistrationOtp();
     await storeRegistrationOtp(email, otp);
+    console.log(`\x1b[32m\x1b[1m[DEV OTP] For ${email} -> Code: ${otp}\x1b[0m`);
     await emailProducer.sendRegistrationOtpEmail(email, name, otp);
 
     return { message: REGISTRATION_OTP_SENT };

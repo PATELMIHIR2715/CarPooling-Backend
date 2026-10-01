@@ -49,6 +49,7 @@ import {
 } from "./constants/labels.js";
 import { initSocket } from "./socket/socket.js";
 import { startEmailWorker } from "./workers/email.worker.js";
+import transporter from "./config/mailer.js";
 import { successResponse } from "./utils/response.utils.js";
 import {
   DATABASE_CONNECTED,
@@ -80,6 +81,20 @@ const authLimiter = ratelimit({
 });
 
 app.use(cors(corsOptions));
+
+// Open 24/7 Keep-Alive Health Check (Exempt from rate limits for Render cron pings)
+app.get(["/", HEALTH_ROUTE, "/api/health"], (_, res) => {
+  res.status(200).json({
+    status: "ok",
+    message: "Service is active and healthy",
+    uptime: `${Math.floor(process.uptime())}s`,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.head(["/", HEALTH_ROUTE, "/api/health"], (_, res) => {
+  res.status(200).end();
+});
 app.use(genralRateLimiter);
 app.use(`${API}${AUTH}`, authLimiter);
 app.use(helmet()); // security headers
@@ -107,9 +122,7 @@ app.use(`${API}${ADMIN}`, tripRotes);
 app.use(`${API}${CHAT}`, chatRoutes);
 app.use(`${API}${PAYMENT}`, paymentRoutes);
 
-app.get(HEALTH_ROUTE, (_, res) => {
-  successResponse(res, null, SERVER_RUNNING, 200);
-});
+
 
 httpServer.listen(port, () => {
   console.log(`io-socket-server running on port ${port}`);
@@ -122,6 +135,13 @@ httpServer.listen(port, () => {
       startBookingCron();
       startWaitlistCron();
       startEmailWorker();
+      transporter.verify((err) => {
+        if (err) {
+          console.warn("[SMTP] Pool warmup warning:", err.message);
+        } else {
+          console.log("[SMTP] Connection pool ready and pre-warmed for instant OTPs");
+        }
+      });
     })
     .catch((err: unknown) => console.error(DATABASE_CONNECTION_FAILED, err));
 });
