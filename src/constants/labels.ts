@@ -40,6 +40,7 @@ export const LOCALHOST_3000 = "http://localhost:3000";
 export const LOCALHOST_5173 = "http://localhost:5173";
 export const LOCALHOST_5174 = "http://localhost:5174";
 export const LOCALHOST_5175 = "http://localhost:5175";
+export const LOCALHOST_8080 = "http://localhost:8080";
 export const LOOPBACK_3000 = "http://127.0.0.1:3000";
 export const LOOPBACK_5173 = "http://127.0.0.1:5173";
 export const MIME_JPEG = "image/jpeg";
