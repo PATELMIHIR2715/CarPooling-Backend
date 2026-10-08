@@ -20,17 +20,18 @@ export const emailQueueConnection = {
   password: env.UPSTASH_REDIS_TOKEN,
   tls: {},
   maxRetriesPerRequest: null,
-  connectTimeout: 5000,
+  connectTimeout: 10000,
   enableOfflineQueue: false,
+  enableAutoPipelining: true,
 };
 
 export const emailQueue = new Queue(EMAIL_QUEUE_NAME, {
   connection: emailQueueConnection,
   defaultJobOptions: {
-    attempts: 3,
+    attempts: 2,
     backoff: {
       type: "exponential",
-      delay: 5000,
+      delay: 15000,
     },
     removeOnComplete: 100,
     removeOnFail: 500,

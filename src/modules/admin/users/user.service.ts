@@ -66,7 +66,11 @@ class AdminUserService {
       });
 
     // Add user ID to Redis set for restricted users
-    await redis.sadd(RESTRICTED_USERS_SET, userId);
+    try {
+      await redis.sadd(RESTRICTED_USERS_SET, userId);
+    } catch (redisErr) {
+      console.warn("[AdminUserService] Redis sadd failed:", (redisErr as any)?.message);
+    }
 
     return updatedUser;
   }
@@ -82,7 +86,11 @@ class AdminUserService {
       });
 
     // Remove user ID from Redis set for restricted users
-    await redis.srem(RESTRICTED_USERS_SET, userId);
+    try {
+      await redis.srem(RESTRICTED_USERS_SET, userId);
+    } catch (redisErr) {
+      console.warn("[AdminUserService] Redis srem failed:", (redisErr as any)?.message);
+    }
 
     return updatedUser;
   }

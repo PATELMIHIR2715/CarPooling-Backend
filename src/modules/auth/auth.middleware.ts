@@ -26,12 +26,16 @@ export const authenticate = async (
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET);
     req.user = decoded;
-    const isRestricted = await redis.sismember(
-      RESTRICTED_USERS_SET,
-      req.user.userId
-    );
-    if (isRestricted) {
-      return errorResponseStandard(new Error(ACCOUNT_RESTRICTED), res, 403);
+    try {
+      const isRestricted = await redis.sismember(
+        RESTRICTED_USERS_SET,
+        req.user.userId
+      );
+      if (isRestricted) {
+        return errorResponseStandard(new Error(ACCOUNT_RESTRICTED), res, 403);
+      }
+    } catch (redisError) {
+      console.warn("[Auth] Redis restriction check skipped due to error:", (redisError as any)?.message);
     }
     next();
   } catch (error) {

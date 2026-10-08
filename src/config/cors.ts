@@ -31,10 +31,8 @@ const developmentOrigins = [
 
 export const allowedOrigins =
   configuredOrigins && configuredOrigins.length > 0
-    ? configuredOrigins
-    : env.NODE_ENV === NODE_ENV_PRODUCTION
-      ? []
-      : developmentOrigins;
+    ? [...configuredOrigins, ...developmentOrigins]
+    : developmentOrigins;
 
 export const corsOptions: CorsOptions = {
   origin(origin, callback) {

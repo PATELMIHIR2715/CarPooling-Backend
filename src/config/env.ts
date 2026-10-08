@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { z } from "zod";
 
 const envSchema = z.object({
@@ -22,6 +23,8 @@ const envSchema = z.object({
   RAZORPAY_KEY_ID: z.string(),
   RAZORPAY_KEY_SECRET: z.string(),
   RAZORPAY_WEBHOOK_SECRET: z.string(),
+  DISABLE_EMAIL_QUEUE: z.string().optional(),
+  EMAIL_DIRECT_FALLBACK: z.string().optional(),
 });
 const env = envSchema.parse(process.env);
 export default env;
