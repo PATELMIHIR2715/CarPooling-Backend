@@ -1,19 +1,48 @@
 import { emailQueue, EMAIL_JOBS } from "../config/queue.js";
 import { processEmailJob } from "./emailJobHandler.utils.js";
+import {
+  isDirectEmailModeEnabled,
+  isUpstashLimitError,
+  tripCircuit,
+} from "./redisCircuitBreaker.utils.js";
 
 const enqueueEmailJob = async (
   jobName: string,
   data: any,
   options: { priority?: number; lifo?: boolean } = {}
 ) => {
+  // If direct sending mode is active or circuit breaker is tripped, bypass Redis completely
+  if (isDirectEmailModeEnabled()) {
+    try {
+      await processEmailJob(jobName, data);
+      return;
+    } catch (directErr) {
+      console.error(
+        `Direct SMTP dispatch failed for ${jobName} to ${data?.to}:`,
+        directErr
+      );
+      return;
+    }
+  }
+
   try {
     await emailQueue.add(jobName, data, options);
-  } catch (error) {
+  } catch (error: any) {
+    if (isUpstashLimitError(error)) {
+      tripCircuit("Upstash Redis command quota exceeded during enqueue");
+    }
     console.error(
-      `Email queue enqueue failed for ${jobName}. Sending directly.`,
-      error
+      `Email queue enqueue failed for ${jobName}. Sending directly via SMTP fallback:`,
+      error?.message || error
     );
-    await processEmailJob(jobName, data);
+    try {
+      await processEmailJob(jobName, data);
+    } catch (fallbackErr) {
+      console.error(
+        `Direct SMTP fallback failed for ${jobName} to ${data?.to}:`,
+        fallbackErr
+      );
+    }
   }
 };
 
